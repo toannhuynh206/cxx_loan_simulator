@@ -1,0 +1,270 @@
+/* ============================================
+   LOAN AMORTIZATION SIMULATOR
+   Modern Minimalist Design System
+   ============================================ */
+
+/* Google Fonts Import */
+@import url('https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,100..900&family=Outfit:wght@100..900&display=swap');
+
+/* ============================================
+   CSS CUSTOM PROPERTIES (Design Tokens)
+   ============================================ */
+
+:root {
+  /* Typography */
+  --font-display: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Spacing Scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* Border Radius */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 9999px;
+
+  /* Shadows - Soft */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.03);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.05);
+
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Light Theme (Default) - Soft & Easy on Eyes */
+:root,
+[data-theme="light"] {
+  --color-bg-primary: #f8f9fa;
+  --color-bg-secondary: #ffffff;
+  --color-bg-tertiary: #f1f3f5;
+  --color-bg-elevated: #ffffff;
+  --color-bg-hover: #e9ecef;
+
+  --color-border: #dee2e6;
+  --color-border-subtle: #e9ecef;
+  --color-border-strong: #ced4da;
+
+  --color-text-primary: #212529;
+  --color-text-secondary: #495057;
+  --color-text-tertiary: #868e96;
+  --color-text-inverse: #f8f9fa;
+
+  --color-accent: #0d9488;
+  --color-accent-hover: #0f766e;
+  --color-accent-subtle: #ccfbf1;
+  --color-accent-muted: #99f6e4;
+
+  --color-success: #059669;
+  --color-success-subtle: #d1fae5;
+  --color-warning: #d97706;
+  --color-warning-subtle: #fef3c7;
+  --color-error: #dc2626;
+  --color-error-subtle: #fee2e2;
+
+  --color-chart-payment: #059669;
+  --color-chart-interest: #dc2626;
+  --color-chart-cumulative: #7c2d12;
+  --color-chart-milestone-25: #7dd3fc;
+  --color-chart-milestone-50: #0ea5e9;
+  --color-chart-milestone-75: #0369a1;
+
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.6);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.05);
+}
+
+/* Dark Theme - Batman's Shadow */
+[data-theme="dark"] {
+  --color-bg-primary: #13151a;
+  --color-bg-secondary: #1a1d24;
+  --color-bg-tertiary: #232730;
+  --color-bg-elevated: #1e2128;
+  --color-bg-hover: #282d38;
+
+  --color-border: #2a2f3a;
+  --color-border-subtle: #232730;
+  --color-border-strong: #3d4450;
+
+  --color-text-primary: #f4f4f5;
+  --color-text-secondary: #c4c7cd;
+  --color-text-tertiary: #8b8f98;
+  --color-text-inverse: #13151a;
+
+  --color-accent: #2dd4bf;
+  --color-accent-hover: #5eead4;
+  --color-accent-subtle: #042f2e;
+  --color-accent-muted: #134e4a;
+
+  --color-success: #34d399;
+  --color-success-subtle: #064e3b;
+  --color-warning: #fbbf24;
+  --color-warning-subtle: #451a03;
+  --color-error: #f87171;
+  --color-error-subtle: #450a0a;
+
+  --color-chart-payment: #34d399;
+  --color-chart-interest: #f87171;
+  --color-chart-cumulative: #fca5a5;
+  --color-chart-milestone-25: #7dd3fc;
+  --color-chart-milestone-50: #38bdf8;
+  --color-chart-milestone-75: #0284c7;
+
+  --glass-bg: rgba(26, 29, 36, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.45), 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.5), 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   BASE STYLES & RESET
+   ============================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-body);
+  font-weight: 450;
+  line-height: 1.6;
+  color: var(--color-text-primary);
+  background-color: var(--color-bg-primary);
+  min-height: 100vh;
+  transition: background var(--transition-slow), color var(--transition-slow);
+  font-optical-sizing: auto;
+}
+
+/* Light mode soft background */
+[data-theme="light"] body,
+body {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(13, 148, 136, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(99, 102, 241, 0.03) 0%, transparent 50%),
+    linear-gradient(180deg, #f8f9fa 0%, #f1f3f5 50%, #f8f9fa 100%);
+  background-attachment: fixed;
+}
+
+/* Dark mode atmospheric background */
+[data-theme="dark"] body {
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(45, 212, 191, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(99, 102, 241, 0.04) 0%, transparent 50%),
+    linear-gradient(180deg, #13151a 0%, #0f1115 50%, #13151a 100%);
+  background-attachment: fixed;
+}
+
+/* Smooth theme transitions for all elements */
+*:not(svg):not(path) {
+  transition:
+    background-color var(--transition-base),
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
+}
+
+/* ============================================
+   TYPOGRAPHY
+   ============================================ */
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--color-text-primary);
+}
+
+h1 { font-size: clamp(2.5rem, 6vw, 4rem); font-weight: 700; }
+h2 { font-size: clamp(1.875rem, 4vw, 2.5rem); font-weight: 600; }
+h3 { font-size: clamp(1.375rem, 2.5vw, 1.75rem); font-weight: 600; }
+h4 { font-size: 1.25rem; font-weight: 600; }
+
+p {
+  color: var(--color-text-secondary);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+/* ============================================
+   MOBILE & TOUCH OPTIMIZATIONS
+   ============================================ */
+
+/* Improve touch targets */
+@media (pointer: coarse) {
+  button,
+  input,
+  select,
+  a {
+    min-height: 44px;
+  }
+}
+
+/* Prevent pull-to-refresh on iOS */
+html {
+  overscroll-behavior: none;
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: max(0px)) {
+  .app {
+    padding-left: max(var(--space-5), env(safe-area-inset-left));
+    padding-right: max(var(--space-5), env(safe-area-inset-right));
+    padding-bottom: max(var(--space-4), env(safe-area-inset-bottom));
+  }
+}
+
+/* Disable tap highlight on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Better text rendering on mobile */
+@media (max-width: 768px) {
+  body {
+    text-size-adjust: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+}

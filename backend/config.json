@@ -1,0 +1,26 @@
+{
+    "listeners": [
+        {
+            "address": "0.0.0.0",
+            "port": 8080,
+            "https": false
+        }
+    ],
+    "app": {
+        "threads_num": 4,
+        "enable_server_header": true,
+        "enable_date_header": true,
+        "max_connections": 100000,
+        "max_connections_per_ip": 0,
+        "client_max_body_size": "1M",
+        "client_max_memory_body_size": "64K",
+        "client_max_websocket_message_size": "128K"
+    },
+    "log": {
+        "log_path": "./logs",
+        "logfile_base_name": "loan-api",
+        "log_size_limit": 100000000,
+        "max_files": 5,
+        "log_level": "INFO"
+    }
+}
