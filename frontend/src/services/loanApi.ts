@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { LoanRequest, LoanResponse } from '../types/loan';
+import { LoanRequest, LoanResponse, LoanEntry, CombinedLoanResult } from '../types/loan';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
@@ -12,6 +12,11 @@ const apiClient = axios.create({
 
 export const calculateLoan = async (request: LoanRequest): Promise<LoanResponse> => {
   const response = await apiClient.post<LoanResponse>('/api/v1/loan/calculate', request);
+  return response.data;
+};
+
+export const calculateMultipleLoans = async (loans: LoanEntry[]): Promise<CombinedLoanResult> => {
+  const response = await apiClient.post<CombinedLoanResult>('/api/v1/loan/calculate-multiple', { loans });
   return response.data;
 };
 

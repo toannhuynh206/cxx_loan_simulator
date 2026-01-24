@@ -1,20 +1,70 @@
 import { useState, useEffect, useMemo } from 'react';
-import { LoanForm } from './components/LoanForm';
+import { LoanInput } from './components/LoanInput';
 import { AmortizationChart } from './components/AmortizationChart';
 import { ResultsSummary } from './components/ResultsSummary';
 import { PaymentSlider } from './components/PaymentSlider';
 import { PaymentBreakdownChart } from './components/PaymentBreakdownChart';
 import { AmortizationTable } from './components/AmortizationTable';
 import { ThemeToggle } from './components/ThemeToggle';
-import { calculateLoan } from './services/loanApi';
-import { LoanRequest, LoanResponse, MonthlyEvent } from './types/loan';
+import { calculateMultipleLoans } from './services/loanApi';
+import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
 import './App.css';
 
 function App() {
-  const [loanData, setLoanData] = useState<LoanResponse | null>(null);
+  const [multiLoanData, setMultiLoanData] = useState<CombinedLoanResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sliderPayment, setSliderPayment] = useState<number>(0);
+
+  // Convert multi-loan data to single LoanResponse for existing components
+  const loanData = useMemo((): LoanResponse | null => {
+    if (!multiLoanData) return null;
+
+    // Combine all loan events into a unified timeline
+    const maxMonths = multiLoanData.totalMonths;
+    const combinedEvents: MonthlyEvent[] = [];
+
+    for (let month = 1; month <= maxMonths; month++) {
+      let totalStartBalance = 0;
+      let totalInterest = 0;
+      let totalPayment = 0;
+      let totalEndBalance = 0;
+
+      for (const loan of multiLoanData.loans) {
+        const event = loan.events.find(e => e.month === month);
+        if (event) {
+          totalStartBalance += event.startBalance;
+          totalInterest += event.interest;
+          totalPayment += event.payment;
+          totalEndBalance += event.endBalance;
+        }
+      }
+
+      if (totalStartBalance > 0.01 || month === 1) {
+        combinedEvents.push({
+          month,
+          startBalance: totalStartBalance,
+          interest: totalInterest,
+          payment: totalPayment,
+          endBalance: totalEndBalance,
+        });
+      }
+    }
+
+    // Calculate weighted average APR
+    const weightedApr = multiLoanData.loans.reduce(
+      (sum, loan) => sum + (loan.apr * loan.principal), 0
+    ) / multiLoanData.totalPrincipal;
+
+    return {
+      principal: multiLoanData.totalPrincipal,
+      apr: weightedApr,
+      monthlyPayment: multiLoanData.totalMonthlyPayment,
+      events: combinedEvents,
+      totalMonths: combinedEvents.length,
+      totalInterest: multiLoanData.totalInterest,
+    };
+  }, [multiLoanData]);
 
   // Reset slider when loan data changes
   useEffect(() => {
@@ -67,13 +117,13 @@ function App() {
     };
   }, [loanData, sliderPayment]);
 
-  const handleSubmit = async (request: LoanRequest) => {
+  const handleCalculate = async (loans: LoanEntry[]) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const response = await calculateLoan(request);
-      setLoanData(response);
+      const response = await calculateMultipleLoans(loans);
+      setMultiLoanData(response);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to calculate loan. Please try again.';
       if (typeof err === 'object' && err !== null && 'response' in err) {
@@ -82,7 +132,7 @@ function App() {
       } else {
         setError(errorMessage);
       }
-      setLoanData(null);
+      setMultiLoanData(null);
     } finally {
       setIsLoading(false);
     }
@@ -100,7 +150,7 @@ function App() {
 
       <main>
         <section className="card input-section">
-          <LoanForm onSubmit={handleSubmit} isLoading={isLoading} />
+          <LoanInput onCalculate={handleCalculate} isLoading={isLoading} />
         </section>
 
         {error && (
