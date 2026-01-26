@@ -10,12 +10,14 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ term, definition, howT
   const [isVisible, setIsVisible] = useState(false);
 
   return (
-    <span className="info-tooltip-wrapper">
+    <span
+      className="info-tooltip-wrapper"
+      onMouseEnter={() => setIsVisible(true)}
+      onMouseLeave={() => setIsVisible(false)}
+    >
       <button
         type="button"
         className="info-tooltip__trigger"
-        onMouseEnter={() => setIsVisible(true)}
-        onMouseLeave={() => setIsVisible(false)}
         onFocus={() => setIsVisible(true)}
         onBlur={() => setIsVisible(false)}
         onClick={(e) => {
@@ -24,10 +26,9 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ term, definition, howT
         }}
         aria-label={`Info about ${term}`}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M12 16v-4" />
-          <path d="M12 8h.01" />
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <circle cx="8" cy="8" r="8"/>
+          <text x="8" y="11.5" textAnchor="middle" fill="white" fontSize="10" fontWeight="600" fontFamily="Georgia, serif" fontStyle="italic">i</text>
         </svg>
       </button>
       {isVisible && (
@@ -36,7 +37,7 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ term, definition, howT
           <div className="info-tooltip__definition">{definition}</div>
           {howToFind && (
             <div className="info-tooltip__how-to-find">
-              <span className="info-tooltip__find-label">📍 Where to find it:</span>
+              <span className="info-tooltip__find-label">Where to find it:</span>
               <span>{howToFind}</span>
             </div>
           )}

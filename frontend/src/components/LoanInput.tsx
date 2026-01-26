@@ -33,7 +33,6 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
       return {
         ...base,
         type: 'credit-card',
-        name: 'Credit Card',
         apr: 0,
         creditLimit: 0,
         minimumPaymentPercent: 2,
@@ -43,7 +42,6 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
       return {
         ...base,
         type: 'personal-loan',
-        name: 'Personal Loan',
         termMonths: 36,
         originationFeePercent: 0,
       } as PersonalLoanEntry;
@@ -51,7 +49,6 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
       return {
         ...base,
         type: 'auto-loan',
-        name: 'Auto Loan',
         termMonths: 60,
         vehiclePrice: 0,
         downPayment: 0,
@@ -64,7 +61,6 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
       return {
         ...base,
         type: 'mortgage',
-        name: 'Mortgage',
         termYears: 30,
         homePrice: 0,
         downPayment: 0,
@@ -79,7 +75,6 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
       return {
         ...base,
         type: 'student-loan',
-        name: 'Student Loan',
         isFederal: true,
         isSubsidized: false,
         originationFeePercent: 1.057,
@@ -164,116 +159,60 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
   };
 
   const renderCreditCardFields = (loan: CreditCardEntry) => (
-    <>
-      <div className="loan-entry__fields">
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>💵 Current Balance</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.balance} />
-          </div>
-          <div className="input-wrapper">
-            <span className="input-prefix">$</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={loan.balance || ''}
-              onChange={(e) => updateLoan('credit-card', loan.id, 'balance', parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-            />
-          </div>
+    <div className="loan-entry__fields">
+      <div className="form-group">
+        <div className="label-with-tooltip">
+          <label>Current Balance</label>
+          <InfoTooltip {...FIELD_DEFINITIONS.balance} />
         </div>
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>📊 APR</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.apr} />
-          </div>
-          <div className="input-wrapper">
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="100"
-              value={loan.apr || ''}
-              onChange={(e) => updateLoan('credit-card', loan.id, 'apr', parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-            />
-            <span className="input-suffix">%</span>
-          </div>
-        </div>
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>🎯 Credit Limit</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.creditLimit} />
-          </div>
-          <div className="input-wrapper">
-            <span className="input-prefix">$</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={loan.creditLimit || ''}
-              onChange={(e) => updateLoan('credit-card', loan.id, 'creditLimit', parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-            />
-          </div>
+        <div className="input-wrapper">
+          <span className="input-prefix">$</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={loan.balance || ''}
+            onChange={(e) => updateLoan('credit-card', loan.id, 'balance', parseFloat(e.target.value) || 0)}
+            placeholder="0.00"
+          />
         </div>
       </div>
-      <div className="loan-entry__fields loan-entry__fields--secondary">
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>💳 Monthly Payment</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
-          </div>
-          <div className="input-wrapper">
-            <span className="input-prefix">$</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={loan.monthlyPayment || ''}
-              onChange={(e) => updateLoan('credit-card', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-            />
-          </div>
+      <div className="form-group">
+        <div className="label-with-tooltip">
+          <label>APR</label>
+          <InfoTooltip {...FIELD_DEFINITIONS.apr} />
         </div>
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>📉 Min Payment %</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.minimumPaymentPercent} />
-          </div>
-          <div className="input-wrapper">
-            <input
-              type="number"
-              step="0.1"
-              min="1"
-              max="10"
-              value={loan.minimumPaymentPercent || ''}
-              onChange={(e) => updateLoan('credit-card', loan.id, 'minimumPaymentPercent', parseFloat(e.target.value) || 2)}
-              placeholder="2"
-            />
-            <span className="input-suffix">%</span>
-          </div>
-        </div>
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>⬇️ Min Payment Floor</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.minimumPaymentFloor} />
-          </div>
-          <div className="input-wrapper">
-            <span className="input-prefix">$</span>
-            <input
-              type="number"
-              step="1"
-              min="0"
-              value={loan.minimumPaymentFloor || ''}
-              onChange={(e) => updateLoan('credit-card', loan.id, 'minimumPaymentFloor', parseFloat(e.target.value) || 25)}
-              placeholder="25"
-            />
-          </div>
+        <div className="input-wrapper">
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            value={loan.apr || ''}
+            onChange={(e) => updateLoan('credit-card', loan.id, 'apr', parseFloat(e.target.value) || 0)}
+            placeholder="0.00"
+          />
+          <span className="input-suffix">%</span>
         </div>
       </div>
-    </>
+      <div className="form-group">
+        <div className="label-with-tooltip">
+          <label>Monthly Payment</label>
+          <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
+        </div>
+        <div className="input-wrapper">
+          <span className="input-prefix">$</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={loan.monthlyPayment || ''}
+            onChange={(e) => updateLoan('credit-card', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
+            placeholder="0.00"
+          />
+        </div>
+      </div>
+    </div>
   );
 
   const renderPersonalLoanFields = (loan: PersonalLoanEntry) => (
@@ -281,7 +220,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       <div className="loan-entry__fields">
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>💵 Loan Balance</label>
+            <label>Loan Balance</label>
             <InfoTooltip {...FIELD_DEFINITIONS.balance} />
           </div>
           <div className="input-wrapper">
@@ -298,7 +237,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>📊 Interest Rate</label>
+            <label>Interest Rate</label>
             <InfoTooltip {...FIELD_DEFINITIONS.interestRate} />
           </div>
           <div className="input-wrapper">
@@ -316,7 +255,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>📅 Term</label>
+            <label>Term</label>
             <InfoTooltip {...FIELD_DEFINITIONS.termMonths} />
           </div>
           <div className="input-wrapper">
@@ -339,7 +278,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       <div className="loan-entry__fields loan-entry__fields--secondary">
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>💳 Monthly Payment</label>
+            <label>Monthly Payment</label>
             <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
           </div>
           <div className="input-wrapper">
@@ -356,7 +295,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>📋 Origination Fee</label>
+            <label>Origination Fee</label>
             <InfoTooltip {...FIELD_DEFINITIONS.originationFee} />
           </div>
           <div className="input-wrapper">
@@ -381,7 +320,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       <div className="loan-entry__fields">
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>🚗 Vehicle Price</label>
+            <label>Vehicle Price</label>
             <InfoTooltip {...FIELD_DEFINITIONS.vehiclePrice} />
           </div>
           <div className="input-wrapper">
@@ -403,7 +342,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>💵 Down Payment</label>
+            <label>Down Payment</label>
             <InfoTooltip {...FIELD_DEFINITIONS.downPayment} />
           </div>
           <div className="input-wrapper">
@@ -425,7 +364,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>📊 Interest Rate</label>
+            <label>Interest Rate</label>
             <InfoTooltip {...FIELD_DEFINITIONS.interestRate} />
           </div>
           <div className="input-wrapper">
@@ -445,7 +384,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       <div className="loan-entry__fields loan-entry__fields--secondary">
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>📅 Term</label>
+            <label>Term</label>
             <InfoTooltip {...FIELD_DEFINITIONS.termMonths} />
           </div>
           <div className="input-wrapper">
@@ -464,7 +403,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>🔄 Trade-in Value</label>
+            <label>Trade-in Value</label>
             <InfoTooltip {...FIELD_DEFINITIONS.tradeInValue} />
           </div>
           <div className="input-wrapper">
@@ -486,7 +425,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>📝 Trade-in Payoff</label>
+            <label>Trade-in Payoff</label>
             <InfoTooltip {...FIELD_DEFINITIONS.tradeInPayoff} />
           </div>
           <div className="input-wrapper">
@@ -509,7 +448,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       </div>
       <div className="loan-entry__fields loan-entry__fields--tertiary">
         <div className="form-group">
-          <label>🧮 Loan Amount</label>
+          <label>Loan Amount</label>
           <div className="input-wrapper input-wrapper--readonly">
             <span className="input-prefix">$</span>
             <input
@@ -522,7 +461,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>📆 Vehicle Year</label>
+            <label>Vehicle Year</label>
             <InfoTooltip {...FIELD_DEFINITIONS.vehicleYear} />
           </div>
           <div className="input-wrapper">
@@ -537,7 +476,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           </div>
         </div>
         <div className="form-group">
-          <label>🆕 Vehicle Type</label>
+          <label>Vehicle Type</label>
           <div className="input-wrapper">
             <select
               value={loan.isUsed ? 'used' : 'new'}
@@ -561,7 +500,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       <>
         <div className="loan-entry__fields">
           <div className="form-group">
-            <label>Home Price</label>
+            <div className="label-with-tooltip">
+              <label>Home Price</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.homePrice} />
+            </div>
             <div className="input-wrapper">
               <span className="input-prefix">$</span>
               <input
@@ -580,7 +522,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
           </div>
           <div className="form-group">
-            <label>Down Payment</label>
+            <div className="label-with-tooltip">
+              <label>Down Payment</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.downPayment} />
+            </div>
             <div className="input-wrapper">
               <span className="input-prefix">$</span>
               <input
@@ -602,7 +547,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
           </div>
           <div className="form-group">
-            <label>Interest Rate</label>
+            <div className="label-with-tooltip">
+              <label>Interest Rate</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.interestRate} />
+            </div>
             <div className="input-wrapper">
               <input
                 type="number"
@@ -619,7 +567,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="loan-entry__fields loan-entry__fields--secondary">
           <div className="form-group">
-            <label>Term</label>
+            <div className="label-with-tooltip">
+              <label>Term</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.mortgageTerm} />
+            </div>
             <div className="input-wrapper">
               <select
                 value={loan.termYears}
@@ -645,7 +596,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
           </div>
           <div className="form-group">
-            <label>Down Payment %</label>
+            <div className="label-with-tooltip">
+              <label>Down Payment %</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.downPaymentPercent} />
+            </div>
             <div className="input-wrapper input-wrapper--readonly">
               <input
                 type="text"
@@ -658,7 +612,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="loan-entry__fields loan-entry__fields--tertiary">
           <div className="form-group">
-            <label>Property Tax (Annual)</label>
+            <div className="label-with-tooltip">
+              <label>Property Tax (Annual)</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.propertyTax} />
+            </div>
             <div className="input-wrapper">
               <span className="input-prefix">$</span>
               <input
@@ -672,7 +629,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
           </div>
           <div className="form-group">
-            <label>Home Insurance (Annual)</label>
+            <div className="label-with-tooltip">
+              <label>Home Insurance (Annual)</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.homeInsurance} />
+            </div>
             <div className="input-wrapper">
               <span className="input-prefix">$</span>
               <input
@@ -686,7 +646,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
           </div>
           <div className="form-group">
-            <label>HOA (Monthly)</label>
+            <div className="label-with-tooltip">
+              <label>HOA (Monthly)</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.hoa} />
+            </div>
             <div className="input-wrapper">
               <span className="input-prefix">$</span>
               <input
@@ -703,7 +666,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         {needsPMI && (
           <div className="loan-entry__fields loan-entry__fields--pmi">
             <div className="form-group">
-              <label>PMI Rate (Annual)</label>
+              <div className="label-with-tooltip">
+                <label>PMI Rate (Annual)</label>
+                <InfoTooltip {...FIELD_DEFINITIONS.pmiRate} />
+              </div>
               <div className="input-wrapper">
                 <input
                   type="number"
@@ -718,7 +684,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
               </div>
             </div>
             <div className="pmi-notice">
-              <span className="pmi-notice__icon">⚠️</span>
+              <span className="pmi-notice__icon">!</span>
               <span>PMI required until you reach 20% equity</span>
             </div>
           </div>
@@ -731,7 +697,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     <>
       <div className="loan-entry__fields">
         <div className="form-group">
-          <label>Loan Balance</label>
+          <div className="label-with-tooltip">
+            <label>Loan Balance</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.balance} />
+          </div>
           <div className="input-wrapper">
             <span className="input-prefix">$</span>
             <input
@@ -745,7 +714,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           </div>
         </div>
         <div className="form-group">
-          <label>Interest Rate</label>
+          <div className="label-with-tooltip">
+            <label>Interest Rate</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.interestRate} />
+          </div>
           <div className="input-wrapper">
             <input
               type="number"
@@ -760,7 +732,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           </div>
         </div>
         <div className="form-group">
-          <label>Monthly Payment</label>
+          <div className="label-with-tooltip">
+            <label>Monthly Payment</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
+          </div>
           <div className="input-wrapper">
             <span className="input-prefix">$</span>
             <input
@@ -776,7 +751,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       </div>
       <div className="loan-entry__fields loan-entry__fields--secondary">
         <div className="form-group">
-          <label>Loan Type</label>
+          <div className="label-with-tooltip">
+            <label>Loan Type</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.isFederal} />
+          </div>
           <div className="input-wrapper">
             <select
               value={loan.isFederal ? 'federal' : 'private'}
@@ -799,7 +777,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         {loan.isFederal && (
           <div className="form-group">
-            <label>Subsidized?</label>
+            <div className="label-with-tooltip">
+              <label>Subsidized?</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.isSubsidized} />
+            </div>
             <div className="input-wrapper">
               <select
                 value={loan.isSubsidized ? 'yes' : 'no'}
@@ -813,7 +794,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           </div>
         )}
         <div className="form-group">
-          <label>Repayment Plan</label>
+          <div className="label-with-tooltip">
+            <label>Repayment Plan</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.repaymentPlan} />
+          </div>
           <div className="input-wrapper">
             <select
               value={loan.repaymentPlan}
@@ -830,7 +814,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       </div>
       <div className="loan-entry__fields loan-entry__fields--tertiary">
         <div className="form-group">
-          <label>Loan Servicer</label>
+          <div className="label-with-tooltip">
+            <label>Loan Servicer</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.loanServicer} />
+          </div>
           <div className="input-wrapper">
             <input
               type="text"
@@ -842,7 +829,10 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         {loan.isFederal && (
           <div className="form-group">
-            <label>Origination Fee</label>
+            <div className="label-with-tooltip">
+              <label>Origination Fee</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.studentOriginationFee} />
+            </div>
             <div className="input-wrapper input-wrapper--readonly">
               <input
                 type="text"
@@ -856,7 +846,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       </div>
       {loan.isSubsidized && (
         <div className="loan-entry__notice loan-entry__notice--info">
-          <span className="notice__icon">ℹ️</span>
+          <span className="notice__icon">i</span>
           <span>Subsidized: Government pays interest while in school and during grace periods</span>
         </div>
       )}
@@ -927,7 +917,14 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                     className="loan-entry__name"
                     value={loan.name}
                     onChange={(e) => updateLoan(activeTab, loan.id, 'name', e.target.value)}
-                    placeholder={`${activeTypeInfo.label} name`}
+                    placeholder={
+                      activeTab === 'credit-card' ? 'e.g., Amex Gold, Chase Sapphire' :
+                      activeTab === 'auto-loan' ? 'e.g., Toyota Camry 2024' :
+                      activeTab === 'mortgage' ? 'e.g., Primary Residence' :
+                      activeTab === 'student-loan' ? 'e.g., Federal Direct Loan' :
+                      activeTab === 'personal-loan' ? 'e.g., SoFi Personal Loan' :
+                      `${activeTypeInfo.label} name`
+                    }
                   />
                   <button
                     type="button"

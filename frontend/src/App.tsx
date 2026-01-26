@@ -8,6 +8,7 @@ import { AmortizationTable } from './components/AmortizationTable';
 import { ThemeToggle } from './components/ThemeToggle';
 import { calculateMultipleLoans } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
+import Logo from './assets/logo.svg';
 import './App.css';
 
 function App() {
@@ -142,8 +143,15 @@ function App() {
     <div className="app">
       <header>
         <div className="header-content">
-          <h1>LoanScope</h1>
-          <p>Visualize every payment, track your progress, and discover exactly how much you can save.</p>
+          <div className="header-brand">
+            <img src={Logo} alt="LoanScope logo" className="header-logo" />
+            <h1>LoanScope</h1>
+          </div>
+          <p className="header-tagline">
+            A tool to <span className="highlight">visualize</span> your loans.
+            <span className="tagline-separator"></span>
+            <span className="highlight">Strategize</span> your path to financial freedom.
+          </p>
         </div>
         <ThemeToggle />
       </header>
@@ -189,7 +197,7 @@ function App() {
       </main>
 
       <footer>
-        <p>LoanScope — Your complete loan visualization tool</p>
+        <p>LoanScope — Strategize your path to financial freedom</p>
       </footer>
     </div>
   );

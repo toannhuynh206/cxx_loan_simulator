@@ -1,0 +1,26 @@
+<svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Circular background -->
+  <circle cx="24" cy="24" r="22" fill="#10B981"/>
+
+  <!-- Calculator body -->
+  <rect x="14" y="10" width="20" height="28" rx="3" fill="white"/>
+
+  <!-- Calculator screen -->
+  <rect x="17" y="13" width="14" height="7" rx="1.5" fill="#10B981"/>
+
+  <!-- Dollar sign on screen -->
+  <text x="24" y="19" text-anchor="middle" fill="white" font-size="6" font-weight="bold" font-family="Arial">$</text>
+
+  <!-- Calculator buttons -->
+  <rect x="17" y="23" width="3" height="3" rx="0.5" fill="#D1FAE5"/>
+  <rect x="22" y="23" width="3" height="3" rx="0.5" fill="#D1FAE5"/>
+  <rect x="27" y="23" width="4" height="3" rx="0.5" fill="#10B981"/>
+
+  <rect x="17" y="28" width="3" height="3" rx="0.5" fill="#D1FAE5"/>
+  <rect x="22" y="28" width="3" height="3" rx="0.5" fill="#D1FAE5"/>
+  <rect x="27" y="28" width="4" height="3" rx="0.5" fill="#10B981"/>
+
+  <rect x="17" y="33" width="3" height="3" rx="0.5" fill="#D1FAE5"/>
+  <rect x="22" y="33" width="3" height="3" rx="0.5" fill="#D1FAE5"/>
+  <rect x="27" y="33" width="4" height="3" rx="0.5" fill="#10B981"/>
+</svg>
