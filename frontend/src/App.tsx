@@ -6,6 +6,7 @@ import { PaymentSlider } from './components/PaymentSlider';
 import { PaymentBreakdownChart } from './components/PaymentBreakdownChart';
 import { AmortizationTable } from './components/AmortizationTable';
 import { ThemeToggle } from './components/ThemeToggle';
+import { DebtPayoffStrategy } from './components/DebtPayoffStrategy';
 import { calculateMultipleLoans } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
 import Logo from './assets/logo.svg';
@@ -16,6 +17,15 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sliderPayment, setSliderPayment] = useState<number>(0);
+  const [resetKey, setResetKey] = useState<number>(0);
+
+  // Reset all state to initial values
+  const handleReset = () => {
+    setMultiLoanData(null);
+    setError(null);
+    setSliderPayment(0);
+    setResetKey(prev => prev + 1); // Force LoanInput to remount
+  };
 
   // Convert multi-loan data to single LoanResponse for existing components
   const loanData = useMemo((): LoanResponse | null => {
@@ -122,8 +132,14 @@ function App() {
     setIsLoading(true);
     setError(null);
 
+    // Add artificial delay to show simulation is "thinking"
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
     try {
-      const response = await calculateMultipleLoans(loans);
+      const [response] = await Promise.all([
+        calculateMultipleLoans(loans),
+        delay(2500) // 2.5 second minimum delay
+      ]);
       setMultiLoanData(response);
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to calculate loan. Please try again.';
@@ -158,7 +174,7 @@ function App() {
 
       <main>
         <section className="card input-section">
-          <LoanInput onCalculate={handleCalculate} isLoading={isLoading} />
+          <LoanInput key={resetKey} onCalculate={handleCalculate} isLoading={isLoading} />
         </section>
 
         {error && (
@@ -177,14 +193,6 @@ function App() {
               <PaymentBreakdownChart data={displayData} />
             </section>
 
-            <section className="card slider-section">
-              <PaymentSlider
-                data={loanData}
-                sliderPayment={sliderPayment}
-                onPaymentChange={setSliderPayment}
-              />
-            </section>
-
             <section className="card chart-section">
               <AmortizationChart data={displayData} />
             </section>
@@ -192,6 +200,21 @@ function App() {
             <section className="card table-section">
               <AmortizationTable data={displayData} />
             </section>
+
+            <section className="card slider-section">
+              <PaymentSlider
+                data={loanData}
+                multiLoanData={multiLoanData}
+                sliderPayment={sliderPayment}
+                onPaymentChange={setSliderPayment}
+              />
+            </section>
+
+            {multiLoanData && multiLoanData.loans.length > 1 && (
+              <section className="card strategy-section">
+                <DebtPayoffStrategy loanData={multiLoanData} />
+              </section>
+            )}
           </>
         )}
       </main>
@@ -199,6 +222,21 @@ function App() {
       <footer>
         <p>LoanScope — Strategize your path to financial freedom</p>
       </footer>
+
+      {/* Floating Action Button */}
+      <div className="fab-container">
+        <button
+          className="fab fab--reset"
+          onClick={handleReset}
+          title="Reset all inputs and results"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+          <span>Reset</span>
+        </button>
+      </div>
     </div>
   );
 }

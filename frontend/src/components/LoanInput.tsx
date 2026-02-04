@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   LoanType,
   LoanEntry,
@@ -10,7 +10,10 @@ import {
   MortgageEntry,
   StudentLoanEntry,
 } from '../types/loan';
+import { PayoffStrategyType, STRATEGY_INFO } from '../types/payoffStrategy';
 import { InfoTooltip, FIELD_DEFINITIONS } from './InfoTooltip';
+
+type StudentLoanMode = 'auto' | 'specify';
 
 interface LoanInputProps {
   onCalculate: (loans: LoanEntry[]) => void;
@@ -18,6 +21,52 @@ interface LoanInputProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+
+// Sample data for each loan type - realistic scenarios
+const SAMPLE_DATA = {
+  'student-loan': (): StudentLoanEntry[] => [
+    {
+      id: generateId(),
+      name: 'Loan 1',
+      type: 'student-loan',
+      balance: 5500,
+      interestRate: 4.99,
+      monthlyPayment: 0,
+    },
+    {
+      id: generateId(),
+      name: 'Loan 2',
+      type: 'student-loan',
+      balance: 3200,
+      interestRate: 5.50,
+      monthlyPayment: 0,
+    },
+    {
+      id: generateId(),
+      name: 'Loan 3',
+      type: 'student-loan',
+      balance: 4800,
+      interestRate: 6.80,
+      monthlyPayment: 0,
+    },
+    {
+      id: generateId(),
+      name: 'Loan 4',
+      type: 'student-loan',
+      balance: 2500,
+      interestRate: 7.50,
+      monthlyPayment: 0,
+    },
+    {
+      id: generateId(),
+      name: 'Loan 5',
+      type: 'student-loan',
+      balance: 4000,
+      interestRate: 9.00,
+      monthlyPayment: 0,
+    },
+  ],
+};
 
 const createEmptyLoan = (type: LoanType): LoanEntry => {
   const base = {
@@ -75,17 +124,12 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
       return {
         ...base,
         type: 'student-loan',
-        isFederal: true,
-        isSubsidized: false,
-        originationFeePercent: 1.057,
-        repaymentPlan: 'standard',
-        loanServicer: '',
       } as StudentLoanEntry;
   }
 };
 
 export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) => {
-  const [activeTab, setActiveTab] = useState<LoanType>('credit-card');
+  const [activeTab, setActiveTab] = useState<LoanType>('student-loan');
   const [loans, setLoans] = useState<AllLoans>({
     'credit-card': [],
     'personal-loan': [],
@@ -94,11 +138,25 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     'student-loan': [],
   });
 
+  // Student loan specific state
+  const [studentLoanMode, setStudentLoanMode] = useState<StudentLoanMode>('auto');
+  const [studentLoanBudget, setStudentLoanBudget] = useState<number>(500);
+  const [studentLoanStrategy, setStudentLoanStrategy] = useState<PayoffStrategyType>('avalanche');
+  const [showAllocation, setShowAllocation] = useState<boolean>(false);
+
+  // Inline editing state for loan names
+  const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
+
   const addLoan = (type: LoanType) => {
-    setLoans(prev => ({
-      ...prev,
-      [type]: [...prev[type], createEmptyLoan(type)],
-    }));
+    setLoans(prev => {
+      const newLoan = createEmptyLoan(type);
+      const newIndex = prev[type].length + 1;
+      newLoan.name = `Loan ${newIndex}`;
+      return {
+        ...prev,
+        [type]: [...prev[type], newLoan],
+      };
+    });
   };
 
   const removeLoan = (type: LoanType, id: string) => {
@@ -106,6 +164,33 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       ...prev,
       [type]: prev[type].filter(loan => loan.id !== id),
     }));
+  };
+
+  const loadSampleData = (type: LoanType) => {
+    if (type === 'student-loan' && SAMPLE_DATA['student-loan']) {
+      const sampleLoans = SAMPLE_DATA['student-loan']();
+      setLoans(prev => ({
+        ...prev,
+        'student-loan': sampleLoans,
+      }));
+
+      // Calculate total minimum payment using Standard Repayment Plan
+      const totalMin = sampleLoans.reduce((sum, loan) => {
+        const monthlyRate = loan.interestRate / 100 / 12;
+        const numPayments = 120;
+        let minPayment: number;
+        if (monthlyRate === 0) {
+          minPayment = loan.balance / numPayments;
+        } else {
+          minPayment = loan.balance * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))
+                     / (Math.pow(1 + monthlyRate, numPayments) - 1);
+        }
+        return sum + minPayment;
+      }, 0);
+
+      setStudentLoanBudget(Math.round(totalMin));
+      setShowAllocation(false);
+    }
   };
 
   const updateLoan = (type: LoanType, id: string, field: string, value: string | number | boolean) => {
@@ -117,13 +202,97 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     }));
   };
 
+  // Calculate auto-allocated payments for student loans based on strategy
+  const getAutoAllocatedStudentLoans = (): StudentLoanEntry[] => {
+    const studentLoans = loans['student-loan'].filter(loan => loan.balance > 0);
+    if (studentLoans.length === 0 || studentLoanBudget <= 0) return studentLoans;
+
+    // Sort loans based on strategy
+    const sortedLoans = [...studentLoans];
+    if (studentLoanStrategy === 'avalanche') {
+      // Highest interest rate first
+      sortedLoans.sort((a, b) => b.interestRate - a.interestRate);
+    } else if (studentLoanStrategy === 'snowball') {
+      // Smallest balance first
+      sortedLoans.sort((a, b) => a.balance - b.balance);
+    }
+    // 'standard' keeps original order
+
+    // Calculate minimum payments using Standard Repayment Plan (10-year fixed)
+    const loansWithMinimums = sortedLoans.map(loan => {
+      const monthlyRate = loan.interestRate / 100 / 12;
+      const numPayments = 120; // 10 years
+
+      let minPayment: number;
+      if (monthlyRate === 0) {
+        minPayment = loan.balance / numPayments;
+      } else {
+        minPayment = loan.balance * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))
+                   / (Math.pow(1 + monthlyRate, numPayments) - 1);
+      }
+
+      return { ...loan, calculatedMinPayment: Math.min(minPayment, loan.balance) };
+    });
+
+    const allocatedPayments = new Map<string, number>();
+
+    if (studentLoanStrategy === 'standard') {
+      // Even distribution: divide budget equally across all loans
+      const activeLoans = loansWithMinimums.filter(l => l.balance > 0);
+      const evenAmount = studentLoanBudget / activeLoans.length;
+
+      for (const loan of activeLoans) {
+        // Cap at the loan balance
+        const payment = Math.min(evenAmount, loan.balance);
+        allocatedPayments.set(loan.id, payment);
+      }
+    } else {
+      // Avalanche or Snowball: minimums first, then extra to priority
+      let remainingBudget = studentLoanBudget;
+
+      // First, assign minimum payments to all loans
+      for (const loan of loansWithMinimums) {
+        const minPayment = Math.min(loan.calculatedMinPayment, remainingBudget, loan.balance);
+        allocatedPayments.set(loan.id, minPayment);
+        remainingBudget -= minPayment;
+      }
+
+      // Then, apply extra to priority loans in order
+      for (const loan of loansWithMinimums) {
+        if (remainingBudget <= 0) break;
+        const currentPayment = allocatedPayments.get(loan.id) || 0;
+        const maxExtra = loan.balance - currentPayment;
+        const extra = Math.min(remainingBudget, maxExtra);
+        allocatedPayments.set(loan.id, currentPayment + extra);
+        remainingBudget -= extra;
+      }
+    }
+
+    // Return loans with allocated payments
+    return studentLoans.map(loan => ({
+      ...loan,
+      monthlyPayment: Math.round((allocatedPayments.get(loan.id) || 0) * 100) / 100
+    }));
+  };
+
+  // Memoized auto-allocated student loans for display
+  const autoAllocatedStudentLoans = useMemo(() => {
+    if (studentLoanMode !== 'auto') return [];
+    return getAutoAllocatedStudentLoans();
+  }, [loans['student-loan'], studentLoanBudget, studentLoanStrategy, studentLoanMode]);
+
   const getAllLoans = (): LoanEntry[] => {
+    // For student loans in auto mode, use calculated payments
+    const processedStudentLoans = studentLoanMode === 'auto'
+      ? getAutoAllocatedStudentLoans()
+      : loans['student-loan'];
+
     return [
+      ...processedStudentLoans,
       ...loans['credit-card'],
       ...loans['personal-loan'],
       ...loans['auto-loan'],
       ...loans['mortgage'],
-      ...loans['student-loan'],
     ].filter(loan => loan.balance > 0);
   };
 
@@ -693,12 +862,32 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     );
   };
 
-  const renderStudentLoanFields = (loan: StudentLoanEntry) => (
-    <>
+  // Calculate minimum payment using Standard Repayment Plan (10-year fixed)
+  // Formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
+  const getRecommendedMinimum = (balance: number, interestRate: number): number => {
+    if (balance <= 0) return 0;
+
+    const monthlyRate = interestRate / 100 / 12;
+    const numPayments = 120; // 10 years = 120 months
+
+    // Handle 0% interest edge case
+    if (monthlyRate === 0) {
+      return balance / numPayments;
+    }
+
+    // Standard amortization formula
+    const payment = balance * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))
+                  / (Math.pow(1 + monthlyRate, numPayments) - 1);
+
+    return Math.min(payment, balance);
+  };
+
+  const renderStudentLoanFields = (loan: StudentLoanEntry) => {
+    return (
       <div className="loan-entry__fields">
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>Loan Balance</label>
+            <label>Balance</label>
             <InfoTooltip {...FIELD_DEFINITIONS.balance} />
           </div>
           <div className="input-wrapper">
@@ -731,127 +920,9 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             <span className="input-suffix">%</span>
           </div>
         </div>
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>Monthly Payment</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
-          </div>
-          <div className="input-wrapper">
-            <span className="input-prefix">$</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={loan.monthlyPayment || ''}
-              onChange={(e) => updateLoan('student-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
-              placeholder="0.00"
-            />
-          </div>
-        </div>
       </div>
-      <div className="loan-entry__fields loan-entry__fields--secondary">
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>Loan Type</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.isFederal} />
-          </div>
-          <div className="input-wrapper">
-            <select
-              value={loan.isFederal ? 'federal' : 'private'}
-              onChange={(e) => {
-                const isFederal = e.target.value === 'federal';
-                updateLoan('student-loan', loan.id, 'isFederal', isFederal);
-                if (!isFederal) {
-                  updateLoan('student-loan', loan.id, 'isSubsidized', false);
-                  updateLoan('student-loan', loan.id, 'originationFeePercent', 0);
-                } else {
-                  updateLoan('student-loan', loan.id, 'originationFeePercent', 1.057);
-                }
-              }}
-              className="form-select"
-            >
-              <option value="federal">Federal</option>
-              <option value="private">Private</option>
-            </select>
-          </div>
-        </div>
-        {loan.isFederal && (
-          <div className="form-group">
-            <div className="label-with-tooltip">
-              <label>Subsidized?</label>
-              <InfoTooltip {...FIELD_DEFINITIONS.isSubsidized} />
-            </div>
-            <div className="input-wrapper">
-              <select
-                value={loan.isSubsidized ? 'yes' : 'no'}
-                onChange={(e) => updateLoan('student-loan', loan.id, 'isSubsidized', e.target.value === 'yes')}
-                className="form-select"
-              >
-                <option value="no">Unsubsidized</option>
-                <option value="yes">Subsidized</option>
-              </select>
-            </div>
-          </div>
-        )}
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>Repayment Plan</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.repaymentPlan} />
-          </div>
-          <div className="input-wrapper">
-            <select
-              value={loan.repaymentPlan}
-              onChange={(e) => updateLoan('student-loan', loan.id, 'repaymentPlan', e.target.value)}
-              className="form-select"
-            >
-              <option value="standard">Standard (10 years)</option>
-              <option value="graduated">Graduated</option>
-              <option value="extended">Extended (25 years)</option>
-              <option value="income-driven">Income-Driven</option>
-            </select>
-          </div>
-        </div>
-      </div>
-      <div className="loan-entry__fields loan-entry__fields--tertiary">
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>Loan Servicer</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.loanServicer} />
-          </div>
-          <div className="input-wrapper">
-            <input
-              type="text"
-              value={loan.loanServicer || ''}
-              onChange={(e) => updateLoan('student-loan', loan.id, 'loanServicer', e.target.value)}
-              placeholder="e.g., Nelnet, MOHELA"
-            />
-          </div>
-        </div>
-        {loan.isFederal && (
-          <div className="form-group">
-            <div className="label-with-tooltip">
-              <label>Origination Fee</label>
-              <InfoTooltip {...FIELD_DEFINITIONS.studentOriginationFee} />
-            </div>
-            <div className="input-wrapper input-wrapper--readonly">
-              <input
-                type="text"
-                value={`${loan.originationFeePercent}%`}
-                readOnly
-                className="input--readonly"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-      {loan.isSubsidized && (
-        <div className="loan-entry__notice loan-entry__notice--info">
-          <span className="notice__icon">i</span>
-          <span>Subsidized: Government pays interest while in school and during grace periods</span>
-        </div>
-      )}
-    </>
-  );
+    );
+  };
 
   return (
     <div className="loan-input">
@@ -898,34 +969,63 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         {activeLoans.length === 0 ? (
           <div className="loan-input__empty">
             <p>No {activeTypeInfo.label.toLowerCase()}s added yet.</p>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={() => addLoan(activeTab)}
-            >
-              + Add Your First {activeTypeInfo.label}
-            </button>
+            <div className="loan-input__empty-actions">
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => addLoan(activeTab)}
+              >
+                + Add Your First {activeTypeInfo.label}
+              </button>
+              {activeTab === 'student-loan' && (
+                <>
+                  <span className="empty-divider">or</span>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sample"
+                    onClick={() => loadSampleData(activeTab)}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
+                      <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.64 5.64l2.12 2.12m8.48 8.48l2.12 2.12M5.64 18.36l2.12-2.12m8.48-8.48l2.12-2.12" />
+                    </svg>
+                    Load Sample Data
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         ) : (
           <div className="loan-entries">
             {activeLoans.map((loan, index) => (
               <div key={loan.id} className="loan-entry">
                 <div className="loan-entry__header">
-                  <span className="loan-entry__number">#{index + 1}</span>
-                  <input
-                    type="text"
-                    className="loan-entry__name"
-                    value={loan.name}
-                    onChange={(e) => updateLoan(activeTab, loan.id, 'name', e.target.value)}
-                    placeholder={
-                      activeTab === 'credit-card' ? 'e.g., Amex Gold, Chase Sapphire' :
-                      activeTab === 'auto-loan' ? 'e.g., Toyota Camry 2024' :
-                      activeTab === 'mortgage' ? 'e.g., Primary Residence' :
-                      activeTab === 'student-loan' ? 'e.g., Federal Direct Loan' :
-                      activeTab === 'personal-loan' ? 'e.g., SoFi Personal Loan' :
-                      `${activeTypeInfo.label} name`
-                    }
-                  />
+                  {editingLoanId === loan.id ? (
+                    <input
+                      type="text"
+                      className="loan-entry__name-input"
+                      value={loan.name}
+                      onChange={(e) => updateLoan(activeTab, loan.id, 'name', e.target.value)}
+                      onBlur={() => setEditingLoanId(null)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') setEditingLoanId(null);
+                        if (e.key === 'Escape') setEditingLoanId(null);
+                      }}
+                      autoFocus
+                      placeholder={`Loan ${index + 1}`}
+                    />
+                  ) : (
+                    <span
+                      className="loan-entry__number loan-entry__number--editable"
+                      onClick={() => setEditingLoanId(loan.id)}
+                      title="Click to rename"
+                    >
+                      {loan.name || `Loan ${index + 1}`}
+                      <svg className="loan-entry__edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14">
+                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                      </svg>
+                    </span>
+                  )}
                   <button
                     type="button"
                     className="loan-entry__remove"
@@ -940,30 +1040,308 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             ))}
           </div>
         )}
+
+        {/* Student Loan Payment Options - shown after loans are entered */}
+        {activeTab === 'student-loan' && activeLoans.length > 0 && (() => {
+          const validLoans = activeLoans.filter((l): l is StudentLoanEntry =>
+            l.type === 'student-loan' && l.balance > 0 && l.interestRate > 0
+          );
+          const totalMinPayment = validLoans.reduce((sum, l) =>
+            sum + getRecommendedMinimum(l.balance, l.interestRate), 0
+          );
+          const hasValidLoans = validLoans.length > 0;
+
+          if (!hasValidLoans) return null;
+
+          return (
+            <div className="student-loan-payment-section">
+              <div className="payment-section-header">
+                <h4>Payment Method</h4>
+              </div>
+
+              <div className="payment-mode-toggle">
+                <div className="payment-mode-option">
+                  <button
+                    type="button"
+                    className={`payment-mode-btn ${studentLoanMode === 'auto' ? 'payment-mode-btn--active' : ''}`}
+                    onClick={() => setStudentLoanMode('auto')}
+                  >
+                    Auto-allocate
+                  </button>
+                  <div className="payment-mode-tooltip">
+                    Enter your total monthly budget and we'll automatically split it across your loans using your chosen strategy.
+                  </div>
+                </div>
+                <div className="payment-mode-option">
+                  <button
+                    type="button"
+                    className={`payment-mode-btn ${studentLoanMode === 'specify' ? 'payment-mode-btn--active' : ''}`}
+                    onClick={() => setStudentLoanMode('specify')}
+                  >
+                    Manual
+                  </button>
+                  <div className="payment-mode-tooltip">
+                    Set your own payment amount for each loan individually.
+                  </div>
+                </div>
+              </div>
+
+              {studentLoanMode === 'auto' && (
+                <div className="split-budget-form">
+                  <div className="budget-input-row">
+                    <div className="budget-field">
+                      <label>Monthly Budget</label>
+                      <div className="input-wrapper">
+                        <span className="input-prefix">$</span>
+                        <input
+                          type="number"
+                          step="10"
+                          min="0"
+                          value={studentLoanBudget || ''}
+                          onChange={(e) => {
+                            setStudentLoanBudget(parseFloat(e.target.value) || 0);
+                            setShowAllocation(false);
+                          }}
+                          placeholder={Math.round(totalMinPayment).toString()}
+                        />
+                      </div>
+                      <div className="budget-minimum-wrap">
+                        <span className="budget-minimum">
+                          Min. ${Math.round(totalMinPayment).toLocaleString()}/mo
+                        </span>
+                        <div className="budget-minimum-tooltip">
+                          <span className="budget-minimum-info">ⓘ</span>
+                          <div className="budget-minimum-tooltip-content">
+                            <strong>Standard Repayment Plan</strong>
+                            <p>Minimum is based on the federal 10-year fixed payment plan — the default repayment schedule for federal student loans.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="strategy-field">
+                      <label>Strategy</label>
+                      <div className="strategy-select-buttons">
+                        <div className="strategy-btn-wrap">
+                          <button
+                            type="button"
+                            className={`strategy-select-btn ${studentLoanStrategy === 'avalanche' ? 'strategy-select-btn--active' : ''}`}
+                            onClick={() => setStudentLoanStrategy('avalanche')}
+                          >
+                            <span className="strategy-icon">⛰️</span>
+                            <span className="strategy-name">Avalanche</span>
+                            <span className="strategy-desc">Highest rate first</span>
+                          </button>
+                          <div className="strategy-hover-tooltip">
+                            <strong>Avalanche Method</strong>
+                            <p>Pay minimums on all loans, put extra toward the highest interest rate first. Saves you the most money over time.</p>
+                          </div>
+                        </div>
+                        <div className="strategy-btn-wrap">
+                          <button
+                            type="button"
+                            className={`strategy-select-btn ${studentLoanStrategy === 'snowball' ? 'strategy-select-btn--active' : ''}`}
+                            onClick={() => setStudentLoanStrategy('snowball')}
+                          >
+                            <span className="strategy-icon">❄️</span>
+                            <span className="strategy-name">Snowball</span>
+                            <span className="strategy-desc">Smallest balance first</span>
+                          </button>
+                          <div className="strategy-hover-tooltip">
+                            <strong>Snowball Method</strong>
+                            <p>Pay minimums on all loans, put extra toward the smallest balance first. Quick wins keep you motivated.</p>
+                          </div>
+                        </div>
+                        <div className="strategy-btn-wrap">
+                          <button
+                            type="button"
+                            className={`strategy-select-btn ${studentLoanStrategy === 'standard' ? 'strategy-select-btn--active' : ''}`}
+                            onClick={() => setStudentLoanStrategy('standard')}
+                          >
+                            <span className="strategy-icon">📊</span>
+                            <span className="strategy-name">Equal</span>
+                            <span className="strategy-desc">Split evenly</span>
+                          </button>
+                          <div className="strategy-hover-tooltip">
+                            <strong>Equal Split</strong>
+                            <p>Divide your budget equally across all loans. Simple and easy to track.</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Allocation Preview */}
+                  {showAllocation && studentLoanBudget > 0 && (
+                    <div className="allocation-preview">
+                      <div className="allocation-header">
+                        <h5>Payment Allocation</h5>
+                        <span className="allocation-strategy">
+                          {studentLoanStrategy === 'avalanche' && '⛰️ Avalanche'}
+                          {studentLoanStrategy === 'snowball' && '❄️ Snowball'}
+                          {studentLoanStrategy === 'standard' && '📊 Equal Split'}
+                        </span>
+                      </div>
+                      <div className="allocation-list">
+                        {autoAllocatedStudentLoans
+                          .filter(loan => loan.balance > 0)
+                          .map((loan, index) => {
+                            const percentage = (loan.monthlyPayment / studentLoanBudget) * 100;
+                            // Find original index for fallback name
+                            const originalIndex = loans['student-loan'].findIndex(l => l.id === loan.id);
+                            const displayName = loan.name || `Loan ${originalIndex >= 0 ? originalIndex + 1 : index + 1}`;
+                            return (
+                              <div key={loan.id} className="allocation-item">
+                                <div className="allocation-item__info">
+                                  <span className="allocation-item__name">{displayName}</span>
+                                  <span className="allocation-item__details">
+                                    ${loan.balance.toLocaleString()} @ {loan.interestRate}%
+                                  </span>
+                                </div>
+                                <div className="allocation-item__bar-container">
+                                  <div
+                                    className="allocation-item__bar"
+                                    style={{ width: `${percentage}%` }}
+                                  />
+                                </div>
+                                <div className="allocation-item__amount">
+                                  <strong>${loan.monthlyPayment.toFixed(0)}</strong>
+                                  <span>/mo</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      <div className="allocation-total">
+                        <span>Total Monthly Payment</span>
+                        <strong>${studentLoanBudget.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {studentLoanMode === 'specify' && (
+                <div className="manual-allocation">
+                  <div className="allocation-header">
+                    <h5>Set Your Payments</h5>
+                    <span className="allocation-strategy">🎚️ Manual</span>
+                  </div>
+                  <div className="allocation-list">
+                    {validLoans.map((loan, index) => {
+                      const minPayment = getRecommendedMinimum(loan.balance, loan.interestRate);
+                      const maxPayment = loan.balance;
+                      const currentPayment = loan.monthlyPayment || minPayment;
+                      const range = maxPayment - minPayment;
+                      const percentage = range > 0 ? ((currentPayment - minPayment) / range) * 100 : 0;
+                      // Find original index for fallback name
+                      const originalIndex = loans['student-loan'].findIndex(l => l.id === loan.id);
+                      const displayName = loan.name || `Loan ${originalIndex >= 0 ? originalIndex + 1 : index + 1}`;
+
+                      return (
+                        <div key={loan.id} className="allocation-item allocation-item--slider">
+                          <div className="allocation-item__info">
+                            <span className="allocation-item__name">{displayName}</span>
+                            <span className="allocation-item__details">
+                              ${loan.balance.toLocaleString()} @ {loan.interestRate}%
+                            </span>
+                            <span className="allocation-item__min">
+                              Min: ${Math.round(minPayment)}/mo
+                            </span>
+                          </div>
+                          <div className="allocation-item__slider-wrap">
+                            <input
+                              type="range"
+                              min={Math.round(minPayment)}
+                              max={Math.round(maxPayment)}
+                              step="10"
+                              value={currentPayment}
+                              onChange={(e) => updateLoan('student-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value))}
+                              className="allocation-slider"
+                            />
+                            <div
+                              className="allocation-item__bar allocation-item__bar--slider"
+                              style={{ width: `${percentage}%` }}
+                            />
+                          </div>
+                          <div className="allocation-item__amount allocation-item__amount--editable">
+                            <span className="amount-prefix">$</span>
+                            <input
+                              type="number"
+                              min={Math.round(minPayment)}
+                              max={Math.round(maxPayment)}
+                              step="10"
+                              value={Math.round(currentPayment)}
+                              onChange={(e) => updateLoan('student-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value) || minPayment)}
+                              className="amount-input"
+                            />
+                            <span>/mo</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="allocation-total">
+                    <span>Total Monthly Payment</span>
+                    <strong>
+                      ${validLoans.reduce((sum, l) => sum + (l.monthlyPayment || getRecommendedMinimum(l.balance, l.interestRate)), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </strong>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
 
-      {/* Calculate Button */}
+      {/* Action Buttons */}
       <div className="loan-input__footer">
         <div className="loan-input__summary">
           {getTotalLoans() > 0 && (
             <span>{getTotalLoans()} loan{getTotalLoans() !== 1 ? 's' : ''} added</span>
           )}
         </div>
-        <button
-          type="submit"
-          className="btn btn--primary"
-          disabled={isLoading || getAllLoans().length === 0}
-          onClick={handleSubmit}
-        >
-          {isLoading ? (
-            <>
-              <span className="spinner" />
-              Calculating...
-            </>
-          ) : (
-            'Calculate Payoff'
-          )}
-        </button>
+        {(() => {
+          const needsAllocation = activeTab === 'student-loan' && studentLoanMode === 'auto' && !showAllocation;
+          const hasValidLoans = getAllLoans().length > 0;
+
+          return (
+            <button
+              type="button"
+              className={`btn btn--primary btn--simulate ${needsAllocation ? 'btn--allocate-step' : ''}`}
+              disabled={isLoading || !hasValidLoans}
+              onClick={(e) => {
+                if (needsAllocation) {
+                  e.preventDefault();
+                  setShowAllocation(true);
+                } else {
+                  handleSubmit(e);
+                }
+              }}
+            >
+              {isLoading ? (
+                <>
+                  <span className="spinner" />
+                  Simulating...
+                </>
+              ) : needsAllocation ? (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                    <path d="M9 5l7 7-7 7" />
+                  </svg>
+                  See Allocation
+                </>
+              ) : (
+                <>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+                    <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                  </svg>
+                  Simulate Future
+                </>
+              )}
+            </button>
+          );
+        })()}
       </div>
     </div>
   );

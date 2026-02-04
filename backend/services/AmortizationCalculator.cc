@@ -385,7 +385,8 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 
 // ============================================
 // STUDENT LOAN CALCULATOR
-// Simple interest with various repayment plans
+// Simple daily interest (not compounding)
+// Interest accrues on principal only, payments apply to interest first then principal
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const StudentLoanEntry& entry) {
     LoanCalculationResult result;
@@ -402,7 +403,9 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
-    double rate = monthlyRate(entry.interestRate);
+    // Simple daily interest rate (annual rate / 365)
+    double dailyRateVal = entry.interestRate / 100.0 / 365.0;
+    const int DAYS_PER_MONTH = 30;  // Assume 30 days between payments
 
     // Determine term based on repayment plan
     int termMonths;
@@ -416,14 +419,17 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
         termMonths = 300;  // Income-driven: up to 25 years
     }
 
-    // Calculate base payment
+    // Calculate base payment using standard amortization formula for initial estimate
+    double monthlyRateVal = entry.interestRate / 100.0 / 12.0;
     double payment = entry.monthlyPayment;
     if (payment <= 0) {
-        payment = calculateAmortizationPayment(entry.balance, rate, termMonths);
+        payment = calculateAmortizationPayment(entry.balance, monthlyRateVal, termMonths);
     }
     result.monthlyPayment = payment;
+    result.minimumPayment = payment;
 
-    double balance = entry.balance;
+    double principal = entry.balance;      // Outstanding principal (only reduced by principal payments)
+    double accruedInterest = 0.0;          // Accumulated unpaid interest (separate from principal)
     int month = 0;
     const int MAX_MONTHS = termMonths + 60;  // Allow some buffer
 
@@ -431,18 +437,22 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
     double graduatedPayment = payment * 0.75;  // Start lower
     double graduatedIncrease = payment * 0.50 / 5.0;  // Increase over 5 periods
 
-    while (balance > 0.01 && month < MAX_MONTHS) {
+    while (principal > 0.01 && month < MAX_MONTHS) {
         month++;
 
         MonthlyEvent event;
         event.month = month;
-        event.startBalance = balance;
+        event.startBalance = principal + accruedInterest;  // Total owed = principal + accrued interest
         event.pmiPayment = 0.0;
         event.escrowPayment = 0.0;
 
-        // Calculate interest (simple interest, not compound)
-        event.interest = balance * rate;
-        result.totalInterest += event.interest;
+        // Step 1: Calculate interest accrued since last payment
+        // Simple daily interest: principal * daily_rate * days
+        // Interest accrues ONLY on principal, NOT on accrued interest (no compounding)
+        double monthlyAccruedInterest = principal * dailyRateVal * DAYS_PER_MONTH;
+        accruedInterest += monthlyAccruedInterest;
+        event.interest = monthlyAccruedInterest;
+        result.totalInterest += monthlyAccruedInterest;
 
         // Determine payment based on plan
         double currentPayment = payment;
@@ -452,19 +462,28 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
             currentPayment = std::min(currentPayment, payment * 1.5);  // Cap at 150% of standard
         }
 
-        // Calculate payment
-        event.payment = std::min(currentPayment, balance + event.interest);
-        event.principalPaid = event.payment - event.interest;
+        // Step 2: Apply payment - INTEREST FIRST, then principal
+        double totalOwed = principal + accruedInterest;
+        event.payment = std::min(currentPayment, totalOwed);
 
-        // Prevent negative principal (interest-only scenario)
-        if (event.principalPaid < 0) {
-            event.principalPaid = 0;
-            balance += (event.interest - event.payment);  // Negative amortization
+        double remainingPayment = event.payment;
+
+        // First: Pay off accrued interest
+        if (remainingPayment >= accruedInterest) {
+            remainingPayment -= accruedInterest;
+            accruedInterest = 0.0;
         } else {
-            balance -= event.principalPaid;
+            // Payment doesn't cover all interest - no principal reduction
+            accruedInterest -= remainingPayment;
+            remainingPayment = 0.0;
         }
 
-        event.endBalance = std::max(0.0, balance);
+        // Second: Any remaining payment goes to principal
+        event.principalPaid = remainingPayment;
+        principal -= event.principalPaid;
+        principal = std::max(0.0, principal);
+
+        event.endBalance = principal + accruedInterest;
         event.totalPayment = event.payment;
         result.totalPaid += event.totalPayment;
         result.events.push_back(event);

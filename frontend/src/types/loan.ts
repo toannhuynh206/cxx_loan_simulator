@@ -10,6 +10,12 @@ export interface LoanTypeInfo {
 
 export const LOAN_TYPES: LoanTypeInfo[] = [
   {
+    id: 'student-loan',
+    label: 'Student Loan',
+    icon: '🎓',
+    description: 'Education debt'
+  },
+  {
     id: 'credit-card',
     label: 'Credit Card',
     icon: '💳',
@@ -32,12 +38,6 @@ export const LOAN_TYPES: LoanTypeInfo[] = [
     label: 'Mortgage',
     icon: '🏠',
     description: 'Home loans'
-  },
-  {
-    id: 'student-loan',
-    label: 'Student Loan',
-    icon: '🎓',
-    description: 'Education debt'
   }
 ];
 
@@ -95,15 +95,10 @@ export interface MortgageEntry extends BaseLoanEntry {
   includeEscrow: boolean;
 }
 
-// Student Loan - Simple interest with subsidized handling
+// Student Loan - Simple interest amortization
 export interface StudentLoanEntry extends BaseLoanEntry {
   type: 'student-loan';
-  interestRate: number; // Fixed rate (not APR)
-  isFederal: boolean;
-  isSubsidized: boolean; // Only for federal undergrad
-  originationFeePercent: number; // 1.057% federal, varies private
-  repaymentPlan: 'standard' | 'graduated' | 'extended' | 'income-driven';
-  loanServicer: string;
+  interestRate: number; // Fixed rate
 }
 
 export type LoanEntry = CreditCardEntry | PersonalLoanEntry | AutoLoanEntry | MortgageEntry | StudentLoanEntry;
