@@ -4292,9 +4292,10 @@ button:focus-visible {
 .strategy-tab {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   padding: var(--space-3) var(--space-4);
   background: transparent;
   border: 2px solid transparent;
@@ -4317,8 +4318,25 @@ button:focus-visible {
   box-shadow: var(--shadow-sm);
 }
 
+.strategy-tab__content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .strategy-tab__icon {
   font-size: 1.25rem;
+}
+
+.strategy-tab__badge {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  padding: 1px 7px;
+  border-radius: 99px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .strategy-description {

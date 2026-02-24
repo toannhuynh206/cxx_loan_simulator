@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { LoanResponse, CombinedLoanResult } from '../types/loan';
-import { monthlyInterestFromApr, simulateSimpleAmortization } from '../utils/amortization';
+import { installmentMonthlyRate, simulateSimpleAmortization } from '../utils/amortization';
 
 interface PaymentSliderProps {
   data: LoanResponse;
@@ -83,7 +83,8 @@ export const PaymentSlider: React.FC<PaymentSliderProps> = ({
         principal: loan.principal,
         apr: loan.apr,
         monthlyPayment: payment,
-        maxMonths: 1200
+        maxMonths: 1200,
+        loanType: loan.loanType
       });
 
       return {
@@ -304,7 +305,9 @@ export const PaymentSlider: React.FC<PaymentSliderProps> = ({
   }
 
   // Fallback: Single slider for combined view (original behavior)
-  const minPayment = Math.ceil(monthlyInterestFromApr(data.principal, data.apr)) + 1;
+  // Combined fallback uses APR/12 (installment model) since the weighted APR
+  // represents a mixed portfolio, predominantly installment loans by dollar value.
+  const minPayment = Math.ceil(data.principal * installmentMonthlyRate(data.apr)) + 1;
   const maxPayment = Math.ceil(data.monthlyPayment * 3);
 
   const sliderResults = useMemo(() => {

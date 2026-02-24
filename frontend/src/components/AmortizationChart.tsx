@@ -56,7 +56,7 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
   }), [theme]);
 
   // Window size and position for zoom/pan (X-axis)
-  const [windowSize, setWindowSize] = useState(totalMonths);
+  const [windowSize, setWindowSize] = useState(Math.min(12, totalMonths));
   const [windowStart, setWindowStart] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showCumulativeInterest, setShowCumulativeInterest] = useState(true);
@@ -67,7 +67,7 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
 
   // Reset window when data changes
   useEffect(() => {
-    setWindowSize(totalMonths);
+    setWindowSize(Math.min(12, totalMonths));
     setWindowStart(0);
     setAnimationMonth(totalMonths); // Show full graph
     setIsSimulating(false);

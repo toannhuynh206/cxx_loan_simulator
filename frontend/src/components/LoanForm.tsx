@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LoanRequest } from '../types/loan';
-import { monthlyInterestFromApr } from '../utils/amortization';
+import { installmentMonthlyRate } from '../utils/amortization';
 
 interface LoanFormProps {
   onSubmit: (request: LoanRequest) => void;
@@ -32,7 +32,7 @@ export const LoanForm: React.FC<LoanFormProps> = ({ onSubmit, isLoading }) => {
 
     // Check if payment covers minimum interest
     if (!newErrors.principal && !newErrors.apr && !newErrors.monthlyPayment) {
-      const monthlyInterest = monthlyInterestFromApr(p, a);
+      const monthlyInterest = p * installmentMonthlyRate(a);
       if (m <= monthlyInterest) {
         newErrors.monthlyPayment = `Payment must exceed $${monthlyInterest.toFixed(2)} to pay off loan`;
       }

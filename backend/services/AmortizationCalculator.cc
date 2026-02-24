@@ -3,6 +3,64 @@
 #include <stdexcept>
 #include <algorithm>
 
+// ============================================================
+// CALCULATION ASSUMPTIONS
+// ============================================================
+//
+// INTEREST TIMING
+//   Interest accrues at the START of each monthly period on the
+//   outstanding balance. The payment is then applied at the END of
+//   that period, covering interest first and reducing principal
+//   with the remainder. This mirrors how lenders actually apply
+//   payments on the due date.
+//
+//   Formula per month:
+//     interest      = balance × monthly_rate
+//     payment       = min(scheduled_payment, balance + interest)
+//     principal_paid = payment - interest
+//     new_balance   = balance + interest - payment
+//
+// RATE MODELS BY LOAN TYPE
+//   Credit card        →  APR / 365 × 30  (daily accrual, 30-day cycle)
+//   Personal loan      →  APR / 12        (actuarial monthly, Reg Z)
+//   Auto loan          →  APR / 12        (actuarial monthly, Reg Z)
+//   Mortgage           →  APR / 12        (actuarial monthly, Reg Z / CFPB)
+//   Student loan       →  APR / 12        (actuarial monthly, Dept. of Ed.)
+//
+// AMORTIZATION PAYMENT FORMULA
+//   M = P × [r(1+r)^n] / [(1+r)^n - 1]
+//   where:
+//     P = principal
+//     r = monthly rate (APR/12 or APR/365×30 depending on type)
+//     n = term in months
+//   Derived so that exactly n equal payments zero the balance.
+//
+// MORTGAGE SPECIFICS
+//   - P&I payment is calculated via the amortization formula.
+//   - Escrow (taxes + insurance + HOA) is added on top.
+//   - PMI is charged when LTV > 80%, automatically cancelled at 78% LTV
+//     or requestable at 80% LTV after 24 months (Homeowners Protection Act).
+//   - totalPaid = P&I payments + PMI + escrow.
+//
+// AUTO LOAN SPECIFICS
+//   - Vehicle depreciation is tracked separately for informational display.
+//   - New car: 25% year 1, 15% thereafter (annual, applied monthly).
+//   - Used car: 15% year 1, 10% thereafter (annual, applied monthly).
+//   - Depreciation does not affect the loan amortization schedule.
+//
+// CREDIT CARD SPECIFICS
+//   - Minimum payment = max(balance × minimumPaymentPercent, minimumPaymentFloor).
+//   - If no payment is provided, the minimum payment is used.
+//   - No fixed term — schedule runs until balance reaches zero.
+//
+// STUDENT LOAN SPECIFICS
+//   - Standard plan: 120-month term (10 years).
+//   - Extended plan: 300-month term (25 years).
+//   - Graduated/income-driven: defaults to 300-month term.
+//   - Payment is calculated via amortization formula if not provided.
+//
+// ============================================================
+
 namespace loan {
 
 bool AmortizationCalculator::validateInput(const LoanRequest& request, std::string& error) {
@@ -21,8 +79,8 @@ bool AmortizationCalculator::validateInput(const LoanRequest& request, std::stri
         return false;
     }
 
-    // Check if payment covers at least the first billing cycle's accrued interest
-    double firstMonthInterest = monthlyAccruedInterest(request.principal, request.apr);
+    // Check payment covers at least the first month's interest (APR/12 model)
+    double firstMonthInterest = request.principal * installmentMonthlyRate(request.apr);
     if (request.monthlyPayment <= firstMonthInterest) {
         error = "Monthly payment must exceed monthly interest ($" +
                 std::to_string(std::round(firstMonthInterest * 100) / 100) +
@@ -40,9 +98,11 @@ double AmortizationCalculator::calculateAmortizationPayment(double principal, do
     return principal * (rate * std::pow(1 + rate, months)) / (std::pow(1 + rate, months) - 1);
 }
 
+// monthlyRate is pre-computed by the caller using the correct model for the loan type.
+// Interest accrues first, then payment is applied (interest first, then principal).
 void AmortizationCalculator::buildSimpleSchedule(
     double principal,
-    double annualRate,
+    double monthlyRate,
     double scheduledPayment,
     int maxMonths,
     std::vector<MonthlyEvent>& events,
@@ -72,9 +132,11 @@ void AmortizationCalculator::buildSimpleSchedule(
         event.pmiPayment = 0.0;
         event.escrowPayment = 0.0;
 
-        event.interest = monthlyAccruedInterest(balance, annualRate);
+        // Interest accrues on the balance at the start of this period
+        event.interest = balance * monthlyRate;
         totalInterest += event.interest;
 
+        // Payment covers interest first, remainder reduces principal
         event.payment = std::min(scheduledPayment, balance + event.interest);
         event.principalPaid = std::max(0.0, event.payment - event.interest);
         balance = balance + event.interest - event.payment;
@@ -88,7 +150,9 @@ void AmortizationCalculator::buildSimpleSchedule(
     totalMonths = month;
 }
 
-// Legacy calculate method for backward compatibility
+// ============================================
+// LEGACY CALCULATE (generic, uses APR/12)
+// ============================================
 LoanResponse AmortizationCalculator::calculate(const LoanRequest& request) {
     std::string error;
     if (!validateInput(request, error)) {
@@ -106,7 +170,7 @@ LoanResponse AmortizationCalculator::calculate(const LoanRequest& request) {
 
     buildSimpleSchedule(
         request.principal,
-        request.apr,
+        installmentMonthlyRate(request.apr),
         request.monthlyPayment,
         1200,
         response.events,
@@ -118,8 +182,7 @@ LoanResponse AmortizationCalculator::calculate(const LoanRequest& request) {
 }
 
 // ============================================
-// CREDIT CARD CALCULATOR
-// Daily APR accrual over monthly cycle, then payment at cycle end
+// CREDIT CARD  —  APR / 365 × 30 (daily accrual model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCardEntry& entry) {
     LoanCalculationResult result;
@@ -135,17 +198,18 @@ LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCa
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
-    // Calculate minimum payment
+    // Credit cards use the daily accrual model: APR / 365 × 30
+    double rate = creditCardMonthlyRate(entry.apr);
+
     double minPaymentByPercent = entry.balance * (entry.minimumPaymentPercent / 100.0);
     result.minimumPayment = std::max(minPaymentByPercent, entry.minimumPaymentFloor);
 
-    // Use provided payment or minimum if not specified
     double payment = entry.monthlyPayment > 0 ? entry.monthlyPayment : result.minimumPayment;
     result.monthlyPayment = payment;
 
     buildSimpleSchedule(
         entry.balance,
-        entry.apr,
+        rate,
         payment,
         1200,
         result.events,
@@ -157,8 +221,7 @@ LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCa
 }
 
 // ============================================
-// PERSONAL LOAN CALCULATOR
-// Simple interest amortization with fixed term
+// PERSONAL LOAN  —  APR / 12 (actuarial monthly model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const PersonalLoanEntry& entry) {
     LoanCalculationResult result;
@@ -175,15 +238,18 @@ LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const Person
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
-    // Calculate amortization payment if not provided
+    // Personal loans use the actuarial monthly model: APR / 12
+    double rate = installmentMonthlyRate(entry.interestRate);
+
     double payment = entry.monthlyPayment;
     if (payment <= 0 && entry.termMonths > 0) {
-        payment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), entry.termMonths);
+        payment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
     }
     result.monthlyPayment = payment;
+
     buildSimpleSchedule(
         entry.balance,
-        entry.interestRate,
+        rate,
         payment,
         entry.termMonths > 0 ? entry.termMonths : 1200,
         result.events,
@@ -195,8 +261,7 @@ LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const Person
 }
 
 // ============================================
-// AUTO LOAN CALCULATOR
-// Simple interest amortization with depreciation tracking
+// AUTO LOAN  —  APR / 12 (actuarial monthly model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEntry& entry) {
     if (entry.vehiclePrice <= 0) {
@@ -228,20 +293,18 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
     result.minimumPayment = 0.0;
     result.equityPercent = 0.0;
 
-    // Calculate amortization payment
-    double payment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), entry.termMonths);
+    // Auto loans use the actuarial monthly model: APR / 12
+    double rate = installmentMonthlyRate(entry.interestRate);
+    double payment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
     result.monthlyPayment = payment;
 
-    // Vehicle depreciation rates (annual)
-    // New cars: ~20% year 1, ~15% year 2-3, ~10% year 4-5
-    // Used cars: ~15% year 1, ~10% thereafter
     double vehicleValue = entry.vehiclePrice;
     double annualDepreciation = entry.isUsed ? 0.10 : 0.15;
-    double firstYearBonus = entry.isUsed ? 0.05 : 0.10;  // Extra depreciation year 1
+    double firstYearBonus = entry.isUsed ? 0.05 : 0.10;
 
     buildSimpleSchedule(
         entry.balance,
-        entry.interestRate,
+        rate,
         payment,
         entry.termMonths,
         result.events,
@@ -251,10 +314,8 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
     );
 
     for (int month = 1; month <= result.totalMonths; month++) {
-        // Calculate depreciation
         double monthlyDepreciation;
         if (month <= 12) {
-            // First year: higher depreciation
             monthlyDepreciation = vehicleValue * (annualDepreciation + firstYearBonus) / 12.0;
         } else {
             monthlyDepreciation = vehicleValue * annualDepreciation / 12.0;
@@ -267,7 +328,7 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
 }
 
 // ============================================
-// MORTGAGE CALCULATOR
+// MORTGAGE  —  APR / 12 (actuarial monthly model)
 // PITI: Principal, Interest, Taxes, Insurance with PMI tracking
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEntry& entry) {
@@ -286,15 +347,14 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 
     int termMonths = entry.termYears * 12;
 
-    // Calculate P&I payment
-    double piPayment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), termMonths);
+    // Mortgage uses the actuarial monthly model: APR / 12
+    double rate = installmentMonthlyRate(entry.interestRate);
+    double piPayment = calculateAmortizationPayment(entry.balance, rate, termMonths);
 
-    // Monthly escrow (taxes + insurance)
     double monthlyTax = entry.propertyTaxAnnual / 12.0;
     double monthlyInsurance = entry.homeInsuranceAnnual / 12.0;
     double escrowPayment = entry.includeEscrow ? (monthlyTax + monthlyInsurance + entry.hoaMonthly) : 0.0;
 
-    // PMI calculation (required if LTV > 80%)
     double originalLTV = entry.balance / entry.homePrice;
     double monthlyPMI = 0.0;
     if (originalLTV > 0.80 && entry.pmiRate > 0) {
@@ -305,7 +365,7 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 
     buildSimpleSchedule(
         entry.balance,
-        entry.interestRate,
+        rate,
         piPayment,
         termMonths,
         result.events,
@@ -315,24 +375,19 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
     );
 
     for (auto& event : result.events) {
-        // Calculate current LTV for PMI using end-of-month balance
         double currentLTV = event.endBalance / entry.homePrice;
         if (currentLTV <= 0.78) {
-            // PMI automatically cancels at 78% LTV
             event.pmiPayment = 0.0;
         } else if (currentLTV <= 0.80 && event.month > 24) {
-            // Can request PMI cancellation at 80% LTV after 2 years
             event.pmiPayment = 0.0;
         } else {
             event.pmiPayment = monthlyPMI;
         }
         result.totalPMI += event.pmiPayment;
 
-        // Escrow payment
         event.escrowPayment = escrowPayment;
         result.totalEscrow += event.escrowPayment;
 
-        // Total monthly payment
         event.totalPayment = event.payment + event.pmiPayment + event.escrowPayment;
         result.totalPaid += (event.pmiPayment + event.escrowPayment);
     }
@@ -343,8 +398,7 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 }
 
 // ============================================
-// STUDENT LOAN CALCULATOR
-// Daily APR accrual over monthly cycle, payment applied at cycle end
+// STUDENT LOAN  —  APR / 12 (actuarial monthly model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const StudentLoanEntry& entry) {
     LoanCalculationResult result;
@@ -361,29 +415,30 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
-    // Determine term based on repayment plan
     int termMonths;
     if (entry.repaymentPlan == "standard") {
-        termMonths = 120;  // 10 years
+        termMonths = 120;
     } else if (entry.repaymentPlan == "extended") {
-        termMonths = 300;  // 25 years
+        termMonths = 300;
     } else if (entry.repaymentPlan == "graduated") {
-        termMonths = 120;  // 10 years, but payments increase
+        termMonths = 120;
     } else {
-        termMonths = 300;  // Income-driven: up to 25 years
+        termMonths = 300;
     }
 
-    // Calculate base payment using monthly cycle rate from daily APR
+    // Student loans use the actuarial monthly model: APR / 12
+    double rate = installmentMonthlyRate(entry.interestRate);
+
     double payment = entry.monthlyPayment;
     if (payment <= 0) {
-        payment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), termMonths);
+        payment = calculateAmortizationPayment(entry.balance, rate, termMonths);
     }
     result.monthlyPayment = payment;
     result.minimumPayment = payment;
 
     buildSimpleSchedule(
         entry.balance,
-        entry.interestRate,
+        rate,
         payment,
         termMonths + 60,
         result.events,
@@ -396,7 +451,6 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
 
 // ============================================
 // GENERIC LOAN DISPATCHER
-// Routes to specialized calculator based on loan type
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateLoan(const LoanEntry& entry) {
     if (entry.type == "credit-card") {
@@ -411,7 +465,7 @@ LoanCalculationResult AmortizationCalculator::calculateLoan(const LoanEntry& ent
         return calculateStudentLoan(StudentLoanEntry::fromJson(entry.rawJson));
     }
 
-    // Fallback to simple amortization
+    // Fallback: treat as installment loan (APR / 12)
     LoanCalculationResult result;
     result.loanId = entry.id;
     result.loanName = entry.name;
@@ -429,7 +483,7 @@ LoanCalculationResult AmortizationCalculator::calculateLoan(const LoanEntry& ent
 
     buildSimpleSchedule(
         entry.balance,
-        entry.interestRate,
+        installmentMonthlyRate(entry.interestRate),
         entry.monthlyPayment,
         1200,
         result.events,

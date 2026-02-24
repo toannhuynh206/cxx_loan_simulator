@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { CombinedLoanResult } from '../types/loan';
 import { PayoffStrategyType, StrategyComparison } from '../types/payoffStrategy';
-import { compareStrategies } from '../services/payoffStrategyService';
+import { compareStrategies, createLoanSnapshots } from '../services/payoffStrategyService';
 import { ExtraPaymentInput } from './ExtraPaymentInput';
 import { StrategySelector } from './StrategySelector';
 import { StrategyComparisonTable } from './StrategyComparisonTable';
@@ -25,11 +25,9 @@ export const DebtPayoffStrategy: React.FC<DebtPayoffStrategyProps> = ({ loanData
   // Get the selected strategy's result
   const selectedResult = comparison.strategies[selectedStrategy];
 
-  // Calculate suggested max extra payment (e.g., 50% of total minimum payments)
-  const totalMinPayments = loanData.loans.reduce(
-    (sum, loan) => sum + (loan.minimumPayment || loan.monthlyPayment),
-    0
-  );
+  // Use the same snapshot logic so mortgage uses P&I only (not PITI)
+  const snapshots = useMemo(() => createLoanSnapshots(loanData), [loanData]);
+  const totalMinPayments = snapshots.reduce((sum, s) => sum + s.minimumPayment, 0);
 
   return (
     <div className="debt-payoff-strategy">

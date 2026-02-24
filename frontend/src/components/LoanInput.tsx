@@ -220,15 +220,31 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
 
     const allocatedPayments = new Map<string, number>();
 
-    if (studentLoanStrategy === 'standard') {
-      // Even distribution: divide budget equally across all loans
-      const activeLoans = loansWithMinimums.filter(l => l.balance > 0);
-      const evenAmount = studentLoanBudget / activeLoans.length;
+    // Helper: max payable for a loan in one month (balance + one month's interest)
+    const maxPayoff = (loan: { balance: number; interestRate: number }) =>
+      loan.balance * (1 + loan.interestRate / 100 / 12);
 
+    if (studentLoanStrategy === 'standard') {
+      // Pay minimums to all loans first, then distribute remaining budget evenly.
+      // Never underpay a loan — even split without minimums causes negative amortization.
+      let remainingBudget = studentLoanBudget;
+      const activeLoans = loansWithMinimums.filter(l => l.balance > 0);
+
+      // Step 1: minimums to all
       for (const loan of activeLoans) {
-        // Cap at the loan balance
-        const payment = Math.min(evenAmount, loan.balance);
-        allocatedPayments.set(loan.id, payment);
+        const minPayment = Math.min(loan.calculatedMinPayment, remainingBudget, loan.balance);
+        allocatedPayments.set(loan.id, minPayment);
+        remainingBudget -= minPayment;
+      }
+
+      // Step 2: split remaining extra evenly
+      if (remainingBudget > 0 && activeLoans.length > 0) {
+        const extraPerLoan = remainingBudget / activeLoans.length;
+        for (const loan of activeLoans) {
+          const currentPayment = allocatedPayments.get(loan.id) ?? 0;
+          const extra = Math.min(extraPerLoan, Math.max(0, maxPayoff(loan) - currentPayment));
+          allocatedPayments.set(loan.id, currentPayment + extra);
+        }
       }
     } else {
       // Avalanche or Snowball: minimums first, then extra to priority
@@ -245,8 +261,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       for (const loan of loansWithMinimums) {
         if (remainingBudget <= 0) break;
         const currentPayment = allocatedPayments.get(loan.id) || 0;
-        const maxExtra = loan.balance - currentPayment;
-        const extra = Math.min(remainingBudget, maxExtra);
+        const extra = Math.min(remainingBudget, Math.max(0, maxPayoff(loan) - currentPayment));
         allocatedPayments.set(loan.id, currentPayment + extra);
         remainingBudget -= extra;
       }

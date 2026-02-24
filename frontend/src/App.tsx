@@ -1,15 +1,13 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { LoanInput } from './components/LoanInput';
 import { AmortizationChart } from './components/AmortizationChart';
 import { ResultsSummary } from './components/ResultsSummary';
-import { PaymentSlider } from './components/PaymentSlider';
 import { PaymentBreakdownChart } from './components/PaymentBreakdownChart';
 import { AmortizationTable } from './components/AmortizationTable';
 import { ThemeToggle } from './components/ThemeToggle';
 import { DebtPayoffStrategy } from './components/DebtPayoffStrategy';
 import { calculateMultipleLoans } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
-import { simulateSimpleAmortization } from './utils/amortization';
 import Logo from './assets/logo.svg';
 import './App.css';
 
@@ -17,14 +15,12 @@ function App() {
   const [multiLoanData, setMultiLoanData] = useState<CombinedLoanResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [sliderPayment, setSliderPayment] = useState<number>(0);
   const [resetKey, setResetKey] = useState<number>(0);
 
   // Reset all state to initial values
   const handleReset = () => {
     setMultiLoanData(null);
     setError(null);
-    setSliderPayment(0);
     setResetKey(prev => prev + 1); // Force LoanInput to remount
   };
 
@@ -78,35 +74,6 @@ function App() {
     };
   }, [multiLoanData]);
 
-  // Reset slider when loan data changes
-  useEffect(() => {
-    if (loanData) {
-      setSliderPayment(loanData.monthlyPayment);
-    }
-  }, [loanData]);
-
-  // Recalculate loan data based on slider payment
-  const displayData = useMemo((): LoanResponse | null => {
-    if (!loanData) return null;
-    if (sliderPayment === loanData.monthlyPayment) return loanData;
-
-    const simulation = simulateSimpleAmortization({
-      principal: loanData.principal,
-      apr: loanData.apr,
-      monthlyPayment: sliderPayment,
-      maxMonths: 1200
-    });
-    const events: MonthlyEvent[] = simulation.events;
-
-    return {
-      principal: loanData.principal,
-      apr: loanData.apr,
-      monthlyPayment: sliderPayment,
-      events,
-      totalMonths: simulation.months,
-      totalInterest: simulation.totalInterest,
-    };
-  }, [loanData, sliderPayment]);
 
   const handleCalculate = async (loans: LoanEntry[]) => {
     setIsLoading(true);
@@ -163,31 +130,22 @@ function App() {
           </section>
         )}
 
-        {loanData && displayData && (
+        {loanData && (
           <>
             <section className="card summary-section">
-              <ResultsSummary data={displayData} />
+              <ResultsSummary data={loanData} />
             </section>
 
             <section className="card breakdown-section">
-              <PaymentBreakdownChart data={displayData} />
+              <PaymentBreakdownChart data={loanData} />
             </section>
 
             <section className="card chart-section">
-              <AmortizationChart data={displayData} />
+              <AmortizationChart data={loanData} />
             </section>
 
             <section className="card table-section">
-              <AmortizationTable data={displayData} />
-            </section>
-
-            <section className="card slider-section">
-              <PaymentSlider
-                data={loanData}
-                multiLoanData={multiLoanData ?? undefined}
-                sliderPayment={sliderPayment}
-                onPaymentChange={setSliderPayment}
-              />
+              <AmortizationTable data={loanData} />
             </section>
 
             {multiLoanData && multiLoanData.loans.length > 1 && (

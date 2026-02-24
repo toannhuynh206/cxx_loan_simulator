@@ -9,6 +9,7 @@ export interface LoanSnapshot {
   apr: number;
   minimumPayment: number;
   loanType: string;
+  totalMonths: number; // original term — used to recompute P&I for mortgages
 }
 
 export interface PayoffOrderItem {

@@ -7,29 +7,98 @@ import {
   StrategyMonthEvent,
   PayoffOrderItem
 } from '../types/payoffStrategy';
-import { monthlyInterestFromApr, paymentForTerm } from '../utils/amortization';
+import { monthlyInterestForLoan, paymentForTerm } from '../utils/amortization';
+
+// ============================================================
+// STRATEGY SIMULATION — CALCULATION ASSUMPTIONS
+// ============================================================
+//
+// MINIMUM PAYMENTS
+//   Each loan's minimum payment is the floor — every strategy
+//   guarantees at least the minimum is paid to every active loan
+//   each month. Extra payment is then routed based on strategy.
+//
+//   Credit card: max(balance × minPercent, minFloor) — recalculated
+//     each month on the current balance so it declines over time.
+//   Installment loans (personal, auto, student): full amortization
+//     payment for the loan's original term.
+//   Mortgage: P&I payment only — escrow (taxes/insurance/HOA) and
+//     PMI are pass-through costs that don't reduce the loan balance
+//     and are excluded from the strategy simulation.
+//
+// FREED PAYMENTS (SNOWBALL EFFECT)
+//   When a loan is paid off, its minimum payment is added to the
+//   available extra for all subsequent months. This is the core
+//   mechanic that makes avalanche and snowball accelerate over time.
+//
+// BASELINE
+//   "Interest saved" and "months saved" are computed relative to
+//   paying only minimums with no extra payment (avalanche with
+//   extraPayment=0, which is equivalent to minimum-only since there
+//   is nothing extra to target). This answers: "how much does adding
+//   extra payment save you vs. just making minimums?"
+//
+// STRATEGIES
+//   Avalanche: pay highest APR first (minimizes total interest — optimal)
+//   Snowball:  pay smallest current balance first (fastest loan eliminations)
+//   Standard:  minimums to all, extra split evenly across all active loans
+//
+// ============================================================
 
 /**
- * Calculate a minimum payment based on standard amortization
- * Used as fallback if no payment is provided
+ * Compute the correct minimum payment for a loan in the strategy simulation.
+ * Key distinction: mortgage uses P&I only (not PITI) and credit card
+ * minimum recalculates on the current balance each month.
  */
-function calculateFallbackMinimum(balance: number, apr: number, termMonths: number = 120): number {
-  return paymentForTerm(balance, apr, termMonths);
+function computeMinimumPayment(
+  loan: { loanType: string; principal: number; apr: number; totalMonths: number; minimumPayment: number; monthlyPayment: number },
+  currentBalance?: number
+): number {
+  if (loan.loanType === 'mortgage') {
+    // Mortgages: backend sets minimumPayment=0 and monthlyPayment=PITI.
+    // We only want P&I — escrow and PMI go to third parties, not the loan.
+    const term = loan.totalMonths > 0 ? loan.totalMonths : 360;
+    return paymentForTerm(loan.principal, loan.apr, term, 'mortgage');
+  }
+
+  if (loan.loanType === 'credit-card' && currentBalance !== undefined) {
+    // Credit cards: minimum is percentage-based, so it shrinks as balance does.
+    // Backend uses 2% floor of $25. We re-apply the same logic on current balance.
+    const MIN_PERCENT = 0.02;
+    const MIN_FLOOR = 25;
+    const percentBased = currentBalance * MIN_PERCENT;
+    return Math.max(percentBased, MIN_FLOOR);
+  }
+
+  // All other installment loans: use backend-provided payment as the minimum floor.
+  return loan.minimumPayment || loan.monthlyPayment;
 }
 
 /**
- * Convert backend loan results to strategy input snapshots
+ * Convert backend loan results to strategy input snapshots.
+ *
+ * We use loan.monthlyPayment (what you're actually paying right now) as the
+ * floor for each loan in the simulation. This means:
+ * - The cascading simulation starts from your real current payments
+ * - The "extra payment" slider adds truly extra money on top
+ * - When a loan pays off, the freed payment is what was actually going to it
+ *
+ * Mortgage exception: monthlyPayment = PITI (includes escrow/PMI which don't
+ * reduce the balance), so we recompute P&I only for mortgages.
  */
 export function createLoanSnapshots(loanData: CombinedLoanResult): LoanSnapshot[] {
   return loanData.loans.map(loan => {
-    // Use the actual payment from the backend, or calculate a fallback
-    // The fallback uses the loan's total months if available, otherwise defaults to 10 years
-    let minimumPayment = loan.minimumPayment || loan.monthlyPayment;
+    let minimumPayment: number;
 
-    // If no payment is set, calculate based on the loan's actual payoff time
-    if (!minimumPayment || minimumPayment <= 0) {
-      const termMonths = loan.totalMonths || 120;
-      minimumPayment = calculateFallbackMinimum(loan.principal, loan.apr, termMonths);
+    if (loan.loanType === 'mortgage') {
+      // Use P&I only — escrow and PMI are pass-through costs, not loan payments
+      const term = loan.totalMonths > 0 ? loan.totalMonths : 360;
+      minimumPayment = paymentForTerm(loan.principal, loan.apr, term, 'mortgage');
+    } else {
+      // Use the actual payment from the backend — reflects whatever the user
+      // configured (auto-allocation, manual entry, or backend-calculated minimum)
+      minimumPayment = loan.monthlyPayment
+        || paymentForTerm(loan.principal, loan.apr, loan.totalMonths || 120, loan.loanType);
     }
 
     return {
@@ -38,37 +107,49 @@ export function createLoanSnapshots(loanData: CombinedLoanResult): LoanSnapshot[
       balance: loan.principal,
       apr: loan.apr,
       minimumPayment,
-      loanType: loan.loanType
+      loanType: loan.loanType,
+      totalMonths: loan.totalMonths,
     };
   });
 }
 
 /**
- * Get the priority order for loans based on strategy
+ * Get the priority order for loans based on strategy, using current balances.
+ * Avalanche: highest APR first (optimal for total interest).
+ * Snowball: smallest CURRENT balance first (fastest eliminations).
  */
 function getLoanPriority(
   loans: LoanSnapshot[],
-  strategy: PayoffStrategyType
+  strategy: PayoffStrategyType,
+  currentBalances: Map<string, number>
 ): LoanSnapshot[] {
   const sortedLoans = [...loans];
 
   switch (strategy) {
     case 'avalanche':
-      // Highest APR first, then smallest balance as tiebreaker
+      // Highest APR first — each dollar saves the most future interest.
+      // Tiebreaker: smaller current balance (eliminates loan sooner, frees minimum faster).
       sortedLoans.sort((a, b) => {
         if (b.apr !== a.apr) return b.apr - a.apr;
-        return a.balance - b.balance;
+        const balA = currentBalances.get(a.id) ?? a.balance;
+        const balB = currentBalances.get(b.id) ?? b.balance;
+        return balA - balB;
       });
       break;
+
     case 'snowball':
-      // Smallest balance first, then highest APR as tiebreaker
+      // Smallest CURRENT balance first — quickest psychological wins.
+      // Tiebreaker: highest APR.
       sortedLoans.sort((a, b) => {
-        if (a.balance !== b.balance) return a.balance - b.balance;
+        const balA = currentBalances.get(a.id) ?? a.balance;
+        const balB = currentBalances.get(b.id) ?? b.balance;
+        if (Math.abs(balA - balB) > 0.01) return balA - balB;
         return b.apr - a.apr;
       });
       break;
+
     case 'standard':
-      // No specific priority for standard - keep original order
+      // No priority ordering needed for standard.
       break;
   }
 
@@ -76,14 +157,13 @@ function getLoanPriority(
 }
 
 /**
- * Simulate a single strategy with given extra payment
+ * Simulate a single payoff strategy with a given extra monthly payment.
  */
 export function simulateStrategy(
   loans: LoanSnapshot[],
   extraPayment: number,
   strategy: PayoffStrategyType
 ): StrategyResult {
-  // Deep clone loans to track balances
   const activeLoanBalances = new Map<string, number>();
   const loanInterestPaid = new Map<string, number>();
   const loanTotalPaid = new Map<string, number>();
@@ -97,62 +177,65 @@ export function simulateStrategy(
   const monthlyEvents: StrategyMonthEvent[] = [];
   const payoffOrder: PayoffOrderItem[] = [];
   let month = 0;
-  const maxMonths = 1200; // 100 years max
+  const maxMonths = 1200;
 
-  // Track freed up minimum payments from paid-off loans
+  // Freed minimums from paid-off loans roll into available extra each month.
   let freedMinPayments = 0;
 
   while (month < maxMonths) {
-    // Check if all loans are paid off
-    const remainingBalances = Array.from(activeLoanBalances.values());
-    if (remainingBalances.every(b => b <= 0.01)) break;
+    if (Array.from(activeLoanBalances.values()).every(b => b <= 0.01)) break;
 
     month++;
 
-    // Get active loans (balance > 0.01)
     const activeLoans = loans.filter(loan =>
-      (activeLoanBalances.get(loan.id) || 0) > 0.01
+      (activeLoanBalances.get(loan.id) ?? 0) > 0.01
     );
-
     if (activeLoans.length === 0) break;
 
-    // Calculate total available extra payment (original extra + freed minimums)
     const totalExtra = extraPayment + freedMinPayments;
-
-    // Distribute payments based on strategy
     const loanPayments = new Map<string, number>();
 
     if (strategy === 'standard') {
-      // Even distribution: total budget split equally across all active loans
-      // Total budget = sum of all minimum payments + extra payment + freed minimums
-      const totalMinimums = activeLoans.reduce((sum, loan) => sum + loan.minimumPayment, 0);
-      const totalBudget = totalMinimums + totalExtra;
-      const paymentPerLoan = totalBudget / activeLoans.length;
+      // Pay minimum to each loan first, then split any extra evenly.
+      // This guarantees no loan is underpaid regardless of portfolio composition.
+      const extraPerLoan = activeLoans.length > 0 ? totalExtra / activeLoans.length : 0;
 
       activeLoans.forEach(loan => {
-        loanPayments.set(loan.id, paymentPerLoan);
+        const balance = activeLoanBalances.get(loan.id) ?? 0;
+        const interest = monthlyInterestForLoan(balance, loan.apr, loan.loanType);
+        // Recalculate credit card minimum on current balance
+        const minimum = loan.loanType === 'credit-card'
+          ? computeMinimumPayment(loan, balance)
+          : loan.minimumPayment;
+        // Cap at full payoff amount to avoid overpaying
+        loanPayments.set(loan.id, Math.min(minimum + extraPerLoan, balance + interest));
       });
-    } else {
-      // Avalanche or Snowball: minimums on all, extra to priority loan
-      const priorityLoans = getLoanPriority(activeLoans, strategy);
 
-      // First, assign minimum payments to all active loans
+    } else {
+      // Avalanche or Snowball: minimums to all, extra to priority loan(s) in order.
+      const priorityLoans = getLoanPriority(activeLoans, strategy, activeLoanBalances);
       let remainingExtra = totalExtra;
 
+      // Step 1: assign minimums to all active loans
       activeLoans.forEach(loan => {
-        loanPayments.set(loan.id, loan.minimumPayment);
+        const balance = activeLoanBalances.get(loan.id) ?? 0;
+        const minimum = loan.loanType === 'credit-card'
+          ? computeMinimumPayment(loan, balance)
+          : loan.minimumPayment;
+        loanPayments.set(loan.id, minimum);
       });
 
-      // Then apply extra to priority loans in order
+      // Step 2: apply remaining extra to priority loans in order
       for (const loan of priorityLoans) {
-        if (remainingExtra <= 0) break;
+        if (remainingExtra <= 0.01) break;
 
-        const balance = activeLoanBalances.get(loan.id) || 0;
-        const currentPayment = loanPayments.get(loan.id) || 0;
-        const maxPayoffThisCycle = balance + monthlyInterestFromApr(balance, loan.apr);
-        const maxExtra = maxPayoffThisCycle - currentPayment;
+        const balance = activeLoanBalances.get(loan.id) ?? 0;
+        const interest = monthlyInterestForLoan(balance, loan.apr, loan.loanType);
+        const currentPayment = loanPayments.get(loan.id) ?? 0;
+        const maxPayoff = balance + interest;
+        const maxExtra = maxPayoff - currentPayment;
 
-        if (maxExtra > 0) {
+        if (maxExtra > 0.01) {
           const extraToApply = Math.min(remainingExtra, maxExtra);
           loanPayments.set(loan.id, currentPayment + extraToApply);
           remainingExtra -= extraToApply;
@@ -160,7 +243,7 @@ export function simulateStrategy(
       }
     }
 
-    // Apply payments and calculate interest
+    // Apply payments, accrue interest, update balances
     const monthEvent: StrategyMonthEvent = {
       month,
       loans: [],
@@ -169,10 +252,9 @@ export function simulateStrategy(
     };
 
     for (const loan of loans) {
-      const startBalance = activeLoanBalances.get(loan.id) || 0;
+      const startBalance = activeLoanBalances.get(loan.id) ?? 0;
 
       if (startBalance <= 0.01) {
-        // Loan already paid off
         monthEvent.loans.push({
           loanId: loan.id,
           loanName: loan.name,
@@ -185,28 +267,30 @@ export function simulateStrategy(
         continue;
       }
 
-      const requestedPayment = loanPayments.get(loan.id) || 0;
-      const interest = monthlyInterestFromApr(startBalance, loan.apr);
+      const requestedPayment = loanPayments.get(loan.id) ?? 0;
+      const interest = monthlyInterestForLoan(startBalance, loan.apr, loan.loanType);
+      // Payment is capped at full payoff — never overshoot the balance
       const payment = Math.min(requestedPayment, startBalance + interest);
       const endBalance = Math.max(0, startBalance + interest - payment);
       const isPaidOff = endBalance <= 0.01;
 
-      // Update tracking
       activeLoanBalances.set(loan.id, endBalance);
-      loanInterestPaid.set(loan.id, (loanInterestPaid.get(loan.id) || 0) + interest);
-      loanTotalPaid.set(loan.id, (loanTotalPaid.get(loan.id) || 0) + payment);
+      loanInterestPaid.set(loan.id, (loanInterestPaid.get(loan.id) ?? 0) + interest);
+      loanTotalPaid.set(loan.id, (loanTotalPaid.get(loan.id) ?? 0) + payment);
 
-      // Record payoff
       if (isPaidOff && !payoffOrder.find(p => p.loanId === loan.id)) {
         payoffOrder.push({
           loanId: loan.id,
           loanName: loan.name,
           payoffMonth: month,
-          totalInterestPaid: loanInterestPaid.get(loan.id) || 0,
-          totalPaid: loanTotalPaid.get(loan.id) || 0
+          totalInterestPaid: loanInterestPaid.get(loan.id) ?? 0,
+          totalPaid: loanTotalPaid.get(loan.id) ?? 0
         });
-        // Add this loan's minimum payment to freed payments
-        freedMinPayments += loan.minimumPayment;
+        // Freed minimum rolls into available extra for all future months
+        const minimum = loan.loanType === 'credit-card'
+          ? computeMinimumPayment(loan, 0)
+          : loan.minimumPayment;
+        freedMinPayments += minimum;
       }
 
       monthEvent.loans.push({
@@ -226,7 +310,6 @@ export function simulateStrategy(
     monthlyEvents.push(monthEvent);
   }
 
-  // Calculate totals
   const totalInterest = Array.from(loanInterestPaid.values()).reduce((sum, v) => sum + v, 0);
   const totalPaid = Array.from(loanTotalPaid.values()).reduce((sum, v) => sum + v, 0);
 
@@ -235,15 +318,17 @@ export function simulateStrategy(
     totalMonths: month,
     totalInterest,
     totalPaid,
-    interestSaved: 0, // Will be calculated in comparison
-    monthsSaved: 0,   // Will be calculated in comparison
+    interestSaved: 0,
+    monthsSaved: 0,
     payoffOrder,
     monthlyEvents
   };
 }
 
 /**
- * Compare all three strategies
+ * Compare all three strategies against a minimum-only baseline.
+ * "Interest saved" = how much less you pay vs. making only minimum payments.
+ * "Months saved"   = how many months sooner you're debt-free.
  */
 export function compareStrategies(
   loanData: CombinedLoanResult,
@@ -251,32 +336,28 @@ export function compareStrategies(
 ): StrategyComparison {
   const loans = createLoanSnapshots(loanData);
 
-  // First, run baseline simulation with NO extra payment to get the original payoff time
-  const baseline = simulateStrategy(loans, 0, 'standard');
+  // Baseline: avalanche with zero extra = pay only minimums, no targeting.
+  // This is the most accurate "minimum-only" baseline because:
+  // - It always pays each loan's exact minimum (guaranteed)
+  // - With zero extra there is nothing to target, so all three strategies are identical
+  const baseline = simulateStrategy(loans, 0, 'avalanche');
 
-  // Run all three simulations with the extra payment
   const avalanche = simulateStrategy(loans, extraPayment, 'avalanche');
-  const snowball = simulateStrategy(loans, extraPayment, 'snowball');
-  const standard = simulateStrategy(loans, extraPayment, 'standard');
+  const snowball  = simulateStrategy(loans, extraPayment, 'snowball');
+  const standard  = simulateStrategy(loans, extraPayment, 'standard');
 
-  // Calculate savings vs baseline (no extra payment)
-  // This shows how much time/interest you save by adding extra payment
   avalanche.interestSaved = baseline.totalInterest - avalanche.totalInterest;
-  avalanche.monthsSaved = baseline.totalMonths - avalanche.totalMonths;
+  avalanche.monthsSaved   = baseline.totalMonths   - avalanche.totalMonths;
 
-  snowball.interestSaved = baseline.totalInterest - snowball.totalInterest;
-  snowball.monthsSaved = baseline.totalMonths - snowball.totalMonths;
+  snowball.interestSaved  = baseline.totalInterest - snowball.totalInterest;
+  snowball.monthsSaved    = baseline.totalMonths   - snowball.totalMonths;
 
-  standard.interestSaved = baseline.totalInterest - standard.totalInterest;
-  standard.monthsSaved = baseline.totalMonths - standard.totalMonths;
+  standard.interestSaved  = baseline.totalInterest - standard.totalInterest;
+  standard.monthsSaved    = baseline.totalMonths   - standard.totalMonths;
 
   return {
     extraPayment,
-    strategies: {
-      avalanche,
-      snowball,
-      standard
-    }
+    strategies: { avalanche, snowball, standard }
   };
 }
 

@@ -22,12 +22,17 @@ export const StrategySelector: React.FC<StrategySelectorProps> = ({
             className={`strategy-tab ${selected === strategy ? 'strategy-tab--active' : ''}`}
             onClick={() => onChange(strategy)}
           >
-            <span className="strategy-tab__icon">
-              {strategy === 'avalanche' && '⛰️'}
-              {strategy === 'snowball' && '❄️'}
-              {strategy === 'standard' && '📊'}
-            </span>
-            <span className="strategy-tab__label">{STRATEGY_INFO[strategy].label}</span>
+            <div className="strategy-tab__content">
+              <span className="strategy-tab__icon">
+                {strategy === 'avalanche' && '⛰️'}
+                {strategy === 'snowball' && '❄️'}
+                {strategy === 'standard' && '📊'}
+              </span>
+              <span className="strategy-tab__label">{STRATEGY_INFO[strategy].label}</span>
+            </div>
+            {strategy === 'avalanche' && (
+              <span className="strategy-tab__badge">Recommended</span>
+            )}
           </button>
         ))}
       </div>
