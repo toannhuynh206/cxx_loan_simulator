@@ -7,26 +7,14 @@ import {
   StrategyMonthEvent,
   PayoffOrderItem
 } from '../types/payoffStrategy';
+import { monthlyInterestFromApr, paymentForTerm } from '../utils/amortization';
 
 /**
  * Calculate a minimum payment based on standard amortization
  * Used as fallback if no payment is provided
  */
 function calculateFallbackMinimum(balance: number, apr: number, termMonths: number = 120): number {
-  if (balance <= 0) return 0;
-
-  const monthlyRate = apr / 100 / 12;
-
-  // Handle 0% interest edge case
-  if (monthlyRate === 0) {
-    return balance / termMonths;
-  }
-
-  // Standard amortization formula
-  const payment = balance * (monthlyRate * Math.pow(1 + monthlyRate, termMonths))
-                / (Math.pow(1 + monthlyRate, termMonths) - 1);
-
-  return Math.min(payment, balance);
+  return paymentForTerm(balance, apr, termMonths);
 }
 
 /**
@@ -142,9 +130,7 @@ export function simulateStrategy(
       const paymentPerLoan = totalBudget / activeLoans.length;
 
       activeLoans.forEach(loan => {
-        const balance = activeLoanBalances.get(loan.id) || 0;
-        const payment = Math.min(paymentPerLoan, balance);
-        loanPayments.set(loan.id, payment);
+        loanPayments.set(loan.id, paymentPerLoan);
       });
     } else {
       // Avalanche or Snowball: minimums on all, extra to priority loan
@@ -154,9 +140,7 @@ export function simulateStrategy(
       let remainingExtra = totalExtra;
 
       activeLoans.forEach(loan => {
-        const balance = activeLoanBalances.get(loan.id) || 0;
-        const payment = Math.min(loan.minimumPayment, balance);
-        loanPayments.set(loan.id, payment);
+        loanPayments.set(loan.id, loan.minimumPayment);
       });
 
       // Then apply extra to priority loans in order
@@ -165,7 +149,8 @@ export function simulateStrategy(
 
         const balance = activeLoanBalances.get(loan.id) || 0;
         const currentPayment = loanPayments.get(loan.id) || 0;
-        const maxExtra = balance - currentPayment;
+        const maxPayoffThisCycle = balance + monthlyInterestFromApr(balance, loan.apr);
+        const maxExtra = maxPayoffThisCycle - currentPayment;
 
         if (maxExtra > 0) {
           const extraToApply = Math.min(remainingExtra, maxExtra);
@@ -200,15 +185,10 @@ export function simulateStrategy(
         continue;
       }
 
-      const payment = loanPayments.get(loan.id) || 0;
-      const monthlyRate = loan.apr / 100 / 12;
-
-      // Standard amortization: interest calculated on starting balance
-      // 1. Calculate interest on the starting balance
-      // 2. Subtract payment from balance
-      // 3. Add interest to get ending balance
-      const interest = startBalance * monthlyRate;
-      const endBalance = Math.max(0, startBalance - payment + interest);
+      const requestedPayment = loanPayments.get(loan.id) || 0;
+      const interest = monthlyInterestFromApr(startBalance, loan.apr);
+      const payment = Math.min(requestedPayment, startBalance + interest);
+      const endBalance = Math.max(0, startBalance + interest - payment);
       const isPaidOff = endBalance <= 0.01;
 
       // Update tracking

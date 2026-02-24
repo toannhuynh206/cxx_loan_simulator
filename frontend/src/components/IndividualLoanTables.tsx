@@ -110,7 +110,7 @@ export const IndividualLoanTables: React.FC<IndividualLoanTablesProps> = ({ resu
                         </tr>
                       </thead>
                       <tbody>
-                        {amortization.map((row, index) => row && (
+                        {amortization.map((row) => row && (
                           <tr key={row.month}>
                             <td>{row.month}</td>
                             <td>{formatCurrency(row.startBalance)}</td>

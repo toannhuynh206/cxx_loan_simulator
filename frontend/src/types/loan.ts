@@ -50,7 +50,7 @@ export interface BaseLoanEntry {
   monthlyPayment: number;
 }
 
-// Credit Card - Daily compounding, APR-based
+// Credit Card - uses shared monthly cycle accrual model
 export interface CreditCardEntry extends BaseLoanEntry {
   type: 'credit-card';
   apr: number; // Annual Percentage Rate
@@ -59,7 +59,7 @@ export interface CreditCardEntry extends BaseLoanEntry {
   minimumPaymentFloor: number; // Usually $25-35
 }
 
-// Personal Loan - Simple interest, fixed term
+// Personal Loan - uses shared monthly cycle accrual model
 export interface PersonalLoanEntry extends BaseLoanEntry {
   type: 'personal-loan';
   interestRate: number; // Fixed APR
@@ -67,10 +67,10 @@ export interface PersonalLoanEntry extends BaseLoanEntry {
   originationFeePercent: number; // 1-8% typical
 }
 
-// Auto Loan - Simple interest with depreciation tracking
+// Auto Loan - uses shared monthly cycle accrual model with depreciation display
 export interface AutoLoanEntry extends BaseLoanEntry {
   type: 'auto-loan';
-  interestRate: number; // Fixed rate
+  interestRate: number; // APR input for auto loan
   termMonths: number; // 36, 48, 60, 72, 84 months
   vehiclePrice: number;
   downPayment: number;
@@ -95,7 +95,7 @@ export interface MortgageEntry extends BaseLoanEntry {
   includeEscrow: boolean;
 }
 
-// Student Loan - Simple interest amortization
+// Student Loan - uses shared monthly cycle accrual model
 export interface StudentLoanEntry extends BaseLoanEntry {
   type: 'student-loan';
   interestRate: number; // Fixed rate

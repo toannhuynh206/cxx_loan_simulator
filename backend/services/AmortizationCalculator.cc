@@ -21,8 +21,8 @@ bool AmortizationCalculator::validateInput(const LoanRequest& request, std::stri
         return false;
     }
 
-    // Check if payment covers at least the first month's interest
-    double firstMonthInterest = request.principal * monthlyRate(request.apr);
+    // Check if payment covers at least the first billing cycle's accrued interest
+    double firstMonthInterest = monthlyAccruedInterest(request.principal, request.apr);
     if (request.monthlyPayment <= firstMonthInterest) {
         error = "Monthly payment must exceed monthly interest ($" +
                 std::to_string(std::round(firstMonthInterest * 100) / 100) +
@@ -38,6 +38,54 @@ double AmortizationCalculator::calculateAmortizationPayment(double principal, do
         return principal / months;
     }
     return principal * (rate * std::pow(1 + rate, months)) / (std::pow(1 + rate, months) - 1);
+}
+
+void AmortizationCalculator::buildSimpleSchedule(
+    double principal,
+    double annualRate,
+    double scheduledPayment,
+    int maxMonths,
+    std::vector<MonthlyEvent>& events,
+    double& totalInterest,
+    double& totalPaid,
+    int& totalMonths
+) const {
+    events.clear();
+    totalInterest = 0.0;
+    totalPaid = 0.0;
+    totalMonths = 0;
+
+    if (principal <= 0 || scheduledPayment <= 0) {
+        return;
+    }
+
+    double balance = principal;
+    int month = 0;
+    const int safeMaxMonths = maxMonths > 0 ? maxMonths : 1200;
+
+    while (balance > 0.01 && month < safeMaxMonths) {
+        month++;
+
+        MonthlyEvent event;
+        event.month = month;
+        event.startBalance = balance;
+        event.pmiPayment = 0.0;
+        event.escrowPayment = 0.0;
+
+        event.interest = monthlyAccruedInterest(balance, annualRate);
+        totalInterest += event.interest;
+
+        event.payment = std::min(scheduledPayment, balance + event.interest);
+        event.principalPaid = std::max(0.0, event.payment - event.interest);
+        balance = balance + event.interest - event.payment;
+
+        event.endBalance = std::max(0.0, balance);
+        event.totalPayment = event.payment;
+        totalPaid += event.totalPayment;
+        events.push_back(event);
+    }
+
+    totalMonths = month;
 }
 
 // Legacy calculate method for backward compatibility
@@ -56,44 +104,22 @@ LoanResponse AmortizationCalculator::calculate(const LoanRequest& request) {
     response.totalPMI = 0.0;
     response.totalEscrow = 0.0;
 
-    double balance = request.principal;
-    double rate = monthlyRate(request.apr);
-    int month = 0;
-
-    const int MAX_MONTHS = 1200;
-
-    while (balance > 0.01 && month < MAX_MONTHS) {
-        month++;
-
-        MonthlyEvent event;
-        event.month = month;
-        event.startBalance = balance;
-        event.pmiPayment = 0.0;
-        event.escrowPayment = 0.0;
-
-        // Apply payment first
-        event.payment = std::min(request.monthlyPayment, balance);
-        balance -= event.payment;
-
-        // Then calculate interest on reduced balance
-        event.interest = balance * rate;
-        response.totalInterest += event.interest;
-        balance += event.interest;
-
-        event.principalPaid = event.payment;
-        event.endBalance = std::max(0.0, balance);
-        event.totalPayment = event.payment;
-        response.totalPaid += event.totalPayment;
-        response.events.push_back(event);
-    }
-
-    response.totalMonths = month;
+    buildSimpleSchedule(
+        request.principal,
+        request.apr,
+        request.monthlyPayment,
+        1200,
+        response.events,
+        response.totalInterest,
+        response.totalPaid,
+        response.totalMonths
+    );
     return response;
 }
 
 // ============================================
 // CREDIT CARD CALCULATOR
-// Daily compounding with average daily balance method
+// Daily APR accrual over monthly cycle, then payment at cycle end
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCardEntry& entry) {
     LoanCalculationResult result;
@@ -117,48 +143,16 @@ LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCa
     double payment = entry.monthlyPayment > 0 ? entry.monthlyPayment : result.minimumPayment;
     result.monthlyPayment = payment;
 
-    double balance = entry.balance;
-    double dailyRateVal = dailyRate(entry.apr);
-    int month = 0;
-    const int MAX_MONTHS = 1200;
-    const int DAYS_PER_MONTH = 30;
-
-    while (balance > 0.01 && month < MAX_MONTHS) {
-        month++;
-
-        MonthlyEvent event;
-        event.month = month;
-        event.startBalance = balance;
-        event.pmiPayment = 0.0;
-        event.escrowPayment = 0.0;
-
-        // Credit cards compound daily on average daily balance
-        // Simplified: compound daily for 30 days
-        double monthlyInterest = 0.0;
-        double dailyBalance = balance;
-
-        for (int day = 0; day < DAYS_PER_MONTH; day++) {
-            double dayInterest = dailyBalance * dailyRateVal;
-            monthlyInterest += dayInterest;
-            dailyBalance += dayInterest;
-        }
-
-        event.interest = monthlyInterest;
-        result.totalInterest += event.interest;
-
-        // Apply payment after interest compounds
-        balance = dailyBalance;
-        event.payment = std::min(payment, balance);
-        balance -= event.payment;
-
-        event.principalPaid = event.payment - event.interest;
-        event.endBalance = std::max(0.0, balance);
-        event.totalPayment = event.payment;
-        result.totalPaid += event.totalPayment;
-        result.events.push_back(event);
-    }
-
-    result.totalMonths = month;
+    buildSimpleSchedule(
+        entry.balance,
+        entry.apr,
+        payment,
+        1200,
+        result.events,
+        result.totalInterest,
+        result.totalPaid,
+        result.totalMonths
+    );
     return result;
 }
 
@@ -181,46 +175,22 @@ LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const Person
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
-    double rate = monthlyRate(entry.interestRate);
-
     // Calculate amortization payment if not provided
     double payment = entry.monthlyPayment;
     if (payment <= 0 && entry.termMonths > 0) {
-        payment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
+        payment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), entry.termMonths);
     }
     result.monthlyPayment = payment;
-
-    double balance = entry.balance;
-    int month = 0;
-    const int MAX_MONTHS = entry.termMonths > 0 ? entry.termMonths : 1200;
-
-    while (balance > 0.01 && month < MAX_MONTHS) {
-        month++;
-
-        MonthlyEvent event;
-        event.month = month;
-        event.startBalance = balance;
-        event.pmiPayment = 0.0;
-        event.escrowPayment = 0.0;
-
-        // Calculate interest first (simple interest)
-        event.interest = balance * rate;
-        result.totalInterest += event.interest;
-
-        // Calculate payment (may be less in final month)
-        event.payment = std::min(payment, balance + event.interest);
-
-        // Principal paid is payment minus interest
-        event.principalPaid = event.payment - event.interest;
-        balance -= event.principalPaid;
-
-        event.endBalance = std::max(0.0, balance);
-        event.totalPayment = event.payment;
-        result.totalPaid += event.totalPayment;
-        result.events.push_back(event);
-    }
-
-    result.totalMonths = month;
+    buildSimpleSchedule(
+        entry.balance,
+        entry.interestRate,
+        payment,
+        entry.termMonths > 0 ? entry.termMonths : 1200,
+        result.events,
+        result.totalInterest,
+        result.totalPaid,
+        result.totalMonths
+    );
     return result;
 }
 
@@ -229,6 +199,22 @@ LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const Person
 // Simple interest amortization with depreciation tracking
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEntry& entry) {
+    if (entry.vehiclePrice <= 0) {
+        throw std::invalid_argument("Auto loan vehiclePrice must be greater than 0");
+    }
+    if (entry.balance <= 0) {
+        throw std::invalid_argument("Auto loan balance must be greater than 0");
+    }
+    if (entry.interestRate < 0 || entry.interestRate > 100) {
+        throw std::invalid_argument("Auto loan APR/interestRate must be between 0 and 100");
+    }
+    if (entry.termMonths <= 0) {
+        throw std::invalid_argument("Auto loan termMonths must be greater than 0");
+    }
+    if (entry.downPayment < 0 || entry.tradeInValue < 0 || entry.tradeInPayoff < 0) {
+        throw std::invalid_argument("Auto loan optional amounts cannot be negative");
+    }
+
     LoanCalculationResult result;
     result.loanId = entry.id;
     result.loanName = entry.name;
@@ -242,10 +228,8 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
     result.minimumPayment = 0.0;
     result.equityPercent = 0.0;
 
-    double rate = monthlyRate(entry.interestRate);
-
     // Calculate amortization payment
-    double payment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
+    double payment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), entry.termMonths);
     result.monthlyPayment = payment;
 
     // Vehicle depreciation rates (annual)
@@ -255,18 +239,18 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
     double annualDepreciation = entry.isUsed ? 0.10 : 0.15;
     double firstYearBonus = entry.isUsed ? 0.05 : 0.10;  // Extra depreciation year 1
 
-    double balance = entry.balance;
-    int month = 0;
+    buildSimpleSchedule(
+        entry.balance,
+        entry.interestRate,
+        payment,
+        entry.termMonths,
+        result.events,
+        result.totalInterest,
+        result.totalPaid,
+        result.totalMonths
+    );
 
-    while (balance > 0.01 && month < entry.termMonths) {
-        month++;
-
-        MonthlyEvent event;
-        event.month = month;
-        event.startBalance = balance;
-        event.pmiPayment = 0.0;
-        event.escrowPayment = 0.0;
-
+    for (int month = 1; month <= result.totalMonths; month++) {
         // Calculate depreciation
         double monthlyDepreciation;
         if (month <= 12) {
@@ -276,23 +260,8 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
             monthlyDepreciation = vehicleValue * annualDepreciation / 12.0;
         }
         vehicleValue = std::max(0.0, vehicleValue - monthlyDepreciation);
-
-        // Calculate interest (simple interest)
-        event.interest = balance * rate;
-        result.totalInterest += event.interest;
-
-        // Calculate payment
-        event.payment = std::min(payment, balance + event.interest);
-        event.principalPaid = event.payment - event.interest;
-        balance -= event.principalPaid;
-
-        event.endBalance = std::max(0.0, balance);
-        event.totalPayment = event.payment;
-        result.totalPaid += event.totalPayment;
-        result.events.push_back(event);
     }
 
-    result.totalMonths = month;
     result.vehicleValue = vehicleValue;
     return result;
 }
@@ -315,16 +284,15 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
     result.minimumPayment = 0.0;
     result.vehicleValue = 0.0;
 
-    double rate = monthlyRate(entry.interestRate);
     int termMonths = entry.termYears * 12;
 
     // Calculate P&I payment
-    double piPayment = calculateAmortizationPayment(entry.balance, rate, termMonths);
+    double piPayment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), termMonths);
 
     // Monthly escrow (taxes + insurance)
     double monthlyTax = entry.propertyTaxAnnual / 12.0;
     double monthlyInsurance = entry.homeInsuranceAnnual / 12.0;
-    double escrowPayment = monthlyTax + monthlyInsurance + entry.hoaMonthly;
+    double escrowPayment = entry.includeEscrow ? (monthlyTax + monthlyInsurance + entry.hoaMonthly) : 0.0;
 
     // PMI calculation (required if LTV > 80%)
     double originalLTV = entry.balance / entry.homePrice;
@@ -335,31 +303,24 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 
     result.monthlyPayment = piPayment + escrowPayment + monthlyPMI;
 
-    double balance = entry.balance;
-    int month = 0;
+    buildSimpleSchedule(
+        entry.balance,
+        entry.interestRate,
+        piPayment,
+        termMonths,
+        result.events,
+        result.totalInterest,
+        result.totalPaid,
+        result.totalMonths
+    );
 
-    while (balance > 0.01 && month < termMonths) {
-        month++;
-
-        MonthlyEvent event;
-        event.month = month;
-        event.startBalance = balance;
-
-        // Calculate interest
-        event.interest = balance * rate;
-        result.totalInterest += event.interest;
-
-        // Calculate principal portion of P&I
-        event.payment = std::min(piPayment, balance + event.interest);
-        event.principalPaid = event.payment - event.interest;
-        balance -= event.principalPaid;
-
-        // Calculate current LTV for PMI
-        double currentLTV = balance / entry.homePrice;
+    for (auto& event : result.events) {
+        // Calculate current LTV for PMI using end-of-month balance
+        double currentLTV = event.endBalance / entry.homePrice;
         if (currentLTV <= 0.78) {
             // PMI automatically cancels at 78% LTV
             event.pmiPayment = 0.0;
-        } else if (currentLTV <= 0.80 && month > 24) {
+        } else if (currentLTV <= 0.80 && event.month > 24) {
             // Can request PMI cancellation at 80% LTV after 2 years
             event.pmiPayment = 0.0;
         } else {
@@ -373,20 +334,17 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 
         // Total monthly payment
         event.totalPayment = event.payment + event.pmiPayment + event.escrowPayment;
-        event.endBalance = std::max(0.0, balance);
-        result.totalPaid += event.totalPayment;
-        result.events.push_back(event);
+        result.totalPaid += (event.pmiPayment + event.escrowPayment);
     }
 
-    result.totalMonths = month;
-    result.equityPercent = ((entry.homePrice - balance) / entry.homePrice) * 100.0;
+    double endingBalance = result.events.empty() ? entry.balance : result.events.back().endBalance;
+    result.equityPercent = ((entry.homePrice - endingBalance) / entry.homePrice) * 100.0;
     return result;
 }
 
 // ============================================
 // STUDENT LOAN CALCULATOR
-// Simple daily interest (not compounding)
-// Interest accrues on principal only, payments apply to interest first then principal
+// Daily APR accrual over monthly cycle, payment applied at cycle end
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const StudentLoanEntry& entry) {
     LoanCalculationResult result;
@@ -403,10 +361,6 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
-    // Simple daily interest rate (annual rate / 365)
-    double dailyRateVal = entry.interestRate / 100.0 / 365.0;
-    const int DAYS_PER_MONTH = 30;  // Assume 30 days between payments
-
     // Determine term based on repayment plan
     int termMonths;
     if (entry.repaymentPlan == "standard") {
@@ -419,77 +373,24 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
         termMonths = 300;  // Income-driven: up to 25 years
     }
 
-    // Calculate base payment using standard amortization formula for initial estimate
-    double monthlyRateVal = entry.interestRate / 100.0 / 12.0;
+    // Calculate base payment using monthly cycle rate from daily APR
     double payment = entry.monthlyPayment;
     if (payment <= 0) {
-        payment = calculateAmortizationPayment(entry.balance, monthlyRateVal, termMonths);
+        payment = calculateAmortizationPayment(entry.balance, cycleRate(entry.interestRate), termMonths);
     }
     result.monthlyPayment = payment;
     result.minimumPayment = payment;
 
-    double principal = entry.balance;      // Outstanding principal (only reduced by principal payments)
-    double accruedInterest = 0.0;          // Accumulated unpaid interest (separate from principal)
-    int month = 0;
-    const int MAX_MONTHS = termMonths + 60;  // Allow some buffer
-
-    // Graduated repayment increases payment every 2 years
-    double graduatedPayment = payment * 0.75;  // Start lower
-    double graduatedIncrease = payment * 0.50 / 5.0;  // Increase over 5 periods
-
-    while (principal > 0.01 && month < MAX_MONTHS) {
-        month++;
-
-        MonthlyEvent event;
-        event.month = month;
-        event.startBalance = principal + accruedInterest;  // Total owed = principal + accrued interest
-        event.pmiPayment = 0.0;
-        event.escrowPayment = 0.0;
-
-        // Step 1: Calculate interest accrued since last payment
-        // Simple daily interest: principal * daily_rate * days
-        // Interest accrues ONLY on principal, NOT on accrued interest (no compounding)
-        double monthlyAccruedInterest = principal * dailyRateVal * DAYS_PER_MONTH;
-        accruedInterest += monthlyAccruedInterest;
-        event.interest = monthlyAccruedInterest;
-        result.totalInterest += monthlyAccruedInterest;
-
-        // Determine payment based on plan
-        double currentPayment = payment;
-        if (entry.repaymentPlan == "graduated") {
-            int period = (month - 1) / 24;  // 2-year periods
-            currentPayment = graduatedPayment + (graduatedIncrease * period);
-            currentPayment = std::min(currentPayment, payment * 1.5);  // Cap at 150% of standard
-        }
-
-        // Step 2: Apply payment - INTEREST FIRST, then principal
-        double totalOwed = principal + accruedInterest;
-        event.payment = std::min(currentPayment, totalOwed);
-
-        double remainingPayment = event.payment;
-
-        // First: Pay off accrued interest
-        if (remainingPayment >= accruedInterest) {
-            remainingPayment -= accruedInterest;
-            accruedInterest = 0.0;
-        } else {
-            // Payment doesn't cover all interest - no principal reduction
-            accruedInterest -= remainingPayment;
-            remainingPayment = 0.0;
-        }
-
-        // Second: Any remaining payment goes to principal
-        event.principalPaid = remainingPayment;
-        principal -= event.principalPaid;
-        principal = std::max(0.0, principal);
-
-        event.endBalance = principal + accruedInterest;
-        event.totalPayment = event.payment;
-        result.totalPaid += event.totalPayment;
-        result.events.push_back(event);
-    }
-
-    result.totalMonths = month;
+    buildSimpleSchedule(
+        entry.balance,
+        entry.interestRate,
+        payment,
+        termMonths + 60,
+        result.events,
+        result.totalInterest,
+        result.totalPaid,
+        result.totalMonths
+    );
     return result;
 }
 
@@ -526,34 +427,16 @@ LoanCalculationResult AmortizationCalculator::calculateLoan(const LoanEntry& ent
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
-    double balance = entry.balance;
-    double rate = monthlyRate(entry.interestRate);
-    int month = 0;
-    const int MAX_MONTHS = 1200;
-
-    while (balance > 0.01 && month < MAX_MONTHS) {
-        month++;
-
-        MonthlyEvent event;
-        event.month = month;
-        event.startBalance = balance;
-        event.pmiPayment = 0.0;
-        event.escrowPayment = 0.0;
-
-        event.interest = balance * rate;
-        result.totalInterest += event.interest;
-
-        event.payment = std::min(entry.monthlyPayment, balance + event.interest);
-        event.principalPaid = event.payment - event.interest;
-        balance -= event.principalPaid;
-
-        event.endBalance = std::max(0.0, balance);
-        event.totalPayment = event.payment;
-        result.totalPaid += event.totalPayment;
-        result.events.push_back(event);
-    }
-
-    result.totalMonths = month;
+    buildSimpleSchedule(
+        entry.balance,
+        entry.interestRate,
+        entry.monthlyPayment,
+        1200,
+        result.events,
+        result.totalInterest,
+        result.totalPaid,
+        result.totalMonths
+    );
     return result;
 }
 

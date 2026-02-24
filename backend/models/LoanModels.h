@@ -155,10 +155,10 @@ struct AutoLoanEntry {
         entry.name = json["name"].asString();
         entry.type = json["type"].asString();
         entry.balance = json["balance"].asDouble();
-        entry.interestRate = json["interestRate"].asDouble();
+        entry.interestRate = json.get("interestRate", json.get("apr", 0.0)).asDouble();
         entry.termMonths = json.get("termMonths", 60).asInt();
-        entry.vehiclePrice = json["vehiclePrice"].asDouble();
-        entry.downPayment = json["downPayment"].asDouble();
+        entry.vehiclePrice = json.get("vehiclePrice", 0.0).asDouble();
+        entry.downPayment = json.get("downPayment", 0.0).asDouble();
         entry.tradeInValue = json.get("tradeInValue", 0.0).asDouble();
         entry.tradeInPayoff = json.get("tradeInPayoff", 0.0).asDouble();
         entry.vehicleYear = json.get("vehicleYear", 2024).asInt();

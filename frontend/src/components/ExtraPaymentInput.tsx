@@ -11,7 +11,9 @@ export const ExtraPaymentInput: React.FC<ExtraPaymentInputProps> = ({
   onChange,
   maxSuggested = 1000
 }) => {
-  const quickAmounts = [50, 100, 200, 500];
+  const quickAmounts = Array.from(new Set([50, 100, 200, 500, Math.max(0, Math.round(maxSuggested))]))
+    .filter((amount) => amount > 0)
+    .sort((a, b) => a - b);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = parseFloat(e.target.value) || 0;

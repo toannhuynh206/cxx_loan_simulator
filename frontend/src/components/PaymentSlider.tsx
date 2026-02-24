@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { LoanResponse, CombinedLoanResult } from '../types/loan';
+import { monthlyInterestFromApr, simulateSimpleAmortization } from '../utils/amortization';
 
 interface PaymentSliderProps {
   data: LoanResponse;
@@ -78,21 +79,12 @@ export const PaymentSlider: React.FC<PaymentSliderProps> = ({
         };
       }
 
-      // Only recalculate if payment was actually changed
-      const monthlyRate = loan.apr / 100 / 12;
-      let balance = loan.principal;
-      let totalInterest = 0;
-      let months = 0;
-      const maxMonths = 1200;
-
-      while (balance > 0.01 && months < maxMonths) {
-        months++;
-        const actualPayment = Math.min(payment, balance);
-        balance -= actualPayment;
-        const interest = balance * monthlyRate;
-        totalInterest += interest;
-        balance += interest;
-      }
+      const simulation = simulateSimpleAmortization({
+        principal: loan.principal,
+        apr: loan.apr,
+        monthlyPayment: payment,
+        maxMonths: 1200
+      });
 
       return {
         loanId: loan.loanId,
@@ -103,11 +95,11 @@ export const PaymentSlider: React.FC<PaymentSliderProps> = ({
         originalPayment,
         newPayment: payment,
         originalMonths,
-        newMonths: months,
+        newMonths: simulation.months,
         originalInterest,
-        newInterest: totalInterest,
-        monthsSaved: originalMonths - months,
-        interestSaved: originalInterest - totalInterest,
+        newInterest: simulation.totalInterest,
+        monthsSaved: originalMonths - simulation.months,
+        interestSaved: originalInterest - simulation.totalInterest,
         minimumPayment: loan.minimumPayment || loan.monthlyPayment,
       };
     });
@@ -312,27 +304,18 @@ export const PaymentSlider: React.FC<PaymentSliderProps> = ({
   }
 
   // Fallback: Single slider for combined view (original behavior)
-  const monthlyRate = data.apr / 100 / 12;
-  const minPayment = Math.ceil(data.principal * monthlyRate) + 1;
+  const minPayment = Math.ceil(monthlyInterestFromApr(data.principal, data.apr)) + 1;
   const maxPayment = Math.ceil(data.monthlyPayment * 3);
 
   const sliderResults = useMemo(() => {
-    let balance = data.principal;
-    let totalInterest = 0;
-    let months = 0;
-    const maxMonths = 1200;
-
-    while (balance > 0.01 && months < maxMonths) {
-      months++;
-      const payment = Math.min(sliderPayment, balance);
-      balance -= payment;
-      const interest = balance * monthlyRate;
-      totalInterest += interest;
-      balance += interest;
-    }
-
-    return { months, totalInterest };
-  }, [data.principal, monthlyRate, sliderPayment]);
+    const simulation = simulateSimpleAmortization({
+      principal: data.principal,
+      apr: data.apr,
+      monthlyPayment: sliderPayment,
+      maxMonths: 1200
+    });
+    return { months: simulation.months, totalInterest: simulation.totalInterest };
+  }, [data.principal, data.apr, sliderPayment]);
 
   const monthsSaved = data.totalMonths - sliderResults.months;
   const interestSaved = data.totalInterest - sliderResults.totalInterest;

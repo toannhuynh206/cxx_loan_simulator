@@ -64,7 +64,7 @@ export const FIELD_DEFINITIONS = {
   // Credit Card
   apr: {
     term: 'APR (Annual Percentage Rate)',
-    definition: 'The yearly interest rate charged on your balance. Credit cards compound this daily, so the actual cost is slightly higher.',
+    definition: 'The annual rate used to accrue monthly interest in this simulator: balance × (APR/365 × 30).',
     howToFind: 'Found on your statement under "Interest Rates" or in your card agreement.',
   },
   creditLimit: {
@@ -86,7 +86,7 @@ export const FIELD_DEFINITIONS = {
   // Personal Loan
   interestRate: {
     term: 'Interest Rate',
-    definition: 'The annual rate charged on your loan balance. Unlike credit cards, this is simple interest.',
+    definition: 'The annual rate used to accrue monthly interest in this simulator: balance × (rate/365 × 30).',
     howToFind: 'Listed on your loan agreement or monthly statement.',
   },
   termMonths: {

@@ -19,10 +19,10 @@ interface AmortizationChartProps {
 interface ChartDataPoint {
   month: number;
   balance: number;
-  green: number | null;  // For green line segments (going down - payment)
-  red: number | null;    // For red line segments (going up - interest)
+  green: number | null;  // For green line segments (payment applied)
+  red: number | null;    // For red line segments (interest accrued)
   eventMonth: number;
-  pointType: 'principal' | 'after_payment' | 'after_interest';
+  pointType: 'principal' | 'after_interest' | 'after_payment';
   cumulativeInterest: number;
   cumulativePrincipalPaid: number;
   payoffPercent: number;
@@ -141,8 +141,8 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
   }, [data]);
 
   // Create data points with separate green/red values for colored line segments:
-  // - Green line: goes DOWN (payment applied) - from start/after-interest to after-payment
-  // - Red line: goes UP (interest added) - from after-payment to after-interest
+  // - Red line: interest accrues first (start -> after-interest)
+  // - Green line: payment is applied second (after-interest -> end balance)
   // We use small offsets to break lines at transition points
   const chartData = useMemo(() => {
     const points: ChartDataPoint[] = [];
@@ -154,8 +154,8 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
       points.push({
         month: 0,
         balance: data.events[0].startBalance,
-        green: data.events[0].startBalance,
-        red: null,
+        green: null,
+        red: data.events[0].startBalance,
         eventMonth: 0,
         pointType: 'principal',
         cumulativeInterest: 0,
@@ -165,61 +165,60 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
     }
 
     data.events.forEach((event) => {
-      const balanceAfterPayment = event.startBalance - event.payment;
+      const balanceAfterInterest = event.startBalance + event.interest;
       const monthPosition = event.month - 1;
-      cumulativePrincipalPaid += event.payment;
+      cumulativeInterest += event.interest;
+      cumulativePrincipalPaid += event.principalPaid ?? Math.max(0, event.payment - event.interest);
       // Payoff percent based on balance reduction
       const payoffPercent = ((data.principal - event.endBalance) / data.principal) * 100;
 
-      // After payment (trough) - green ends here, red starts here
+      // After interest accrual (peak) - red ends here, green starts here
       points.push({
         month: monthPosition + 0.5,
-        balance: balanceAfterPayment,
-        green: balanceAfterPayment,
-        red: balanceAfterPayment,
+        balance: balanceAfterInterest,
+        green: balanceAfterInterest,
+        red: balanceAfterInterest,
         eventMonth: event.month,
-        pointType: 'after_payment',
+        pointType: 'after_interest',
         cumulativeInterest: cumulativeInterest,
         cumulativePrincipalPaid,
         payoffPercent,
       });
 
-      // Break green line (tiny offset after trough) - only red continues
+      // Break red line (tiny offset after peak) - only green continues
       points.push({
         month: monthPosition + 0.501,
-        balance: balanceAfterPayment,
-        green: null,
-        red: balanceAfterPayment,
+        balance: balanceAfterInterest,
+        green: balanceAfterInterest,
+        red: null,
         eventMonth: event.month,
-        pointType: 'after_payment',
+        pointType: 'after_interest',
         cumulativeInterest: cumulativeInterest,
         cumulativePrincipalPaid,
         payoffPercent,
       });
 
-      cumulativeInterest += event.interest;
-
-      // After interest (end of month) - red ends here, green starts for next
+      // After payment (end balance) - green ends here, red starts for next month
       points.push({
         month: event.month,
         balance: event.endBalance,
         green: event.endBalance,
         red: event.endBalance,
         eventMonth: event.month,
-        pointType: 'after_interest',
+        pointType: 'after_payment',
         cumulativeInterest: cumulativeInterest,
         cumulativePrincipalPaid,
         payoffPercent,
       });
 
-      // Break red line (tiny offset after end) - only green continues to next payment
+      // Break green line (tiny offset after end) - only red continues to next interest accrual
       points.push({
         month: event.month + 0.001,
         balance: event.endBalance,
-        green: event.endBalance,
-        red: null,
+        green: null,
+        red: event.endBalance,
         eventMonth: event.month,
-        pointType: 'after_interest',
+        pointType: 'after_payment',
         cumulativeInterest: cumulativeInterest,
         cumulativePrincipalPaid,
         payoffPercent,
@@ -282,28 +281,28 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
 
       const event = data.events.find(e => e.month === point.eventMonth);
       if (event) {
-        const balanceAfterPayment = event.startBalance - event.payment;
-        const isAfterPayment = point.pointType === 'after_payment';
-        const netProgress = event.payment - event.interest;
+        const balanceAfterInterest = event.startBalance + event.interest;
+        const isAfterInterest = point.pointType === 'after_interest';
+        const principalPaid = event.principalPaid ?? Math.max(0, event.payment - event.interest);
 
         return (
           <div className="custom-tooltip">
             <p><strong>Month {event.month}</strong></p>
-            <p style={{ fontSize: '1.1rem', fontWeight: 700, color: isAfterPayment ? colors.payment : colors.interest }}>
+            <p style={{ fontSize: '1.1rem', fontWeight: 700, color: isAfterInterest ? colors.interest : colors.payment }}>
               Balance: {formatCurrency(point.balance)}
             </p>
             <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              {isAfterPayment ? 'After Payment' : 'After Interest'}
+              {isAfterInterest ? 'After Interest' : 'After Payment'}
             </p>
             <hr />
             <p>Start: {formatCurrency(event.startBalance)}</p>
-            <p style={{ color: colors.payment }}>- Payment: {formatCurrency(event.payment)}</p>
-            <p style={{ color: colors.payment }}>= {formatCurrency(balanceAfterPayment)}</p>
             <p style={{ color: colors.interest }}>+ Interest: {formatCurrency(event.interest)}</p>
+            <p style={{ color: colors.interest }}>= {formatCurrency(balanceAfterInterest)}</p>
+            <p style={{ color: colors.payment }}>- Payment: {formatCurrency(event.payment)}</p>
             <p><strong>End: {formatCurrency(event.endBalance)}</strong></p>
             <hr />
             <p style={{ color: colors.accent, fontWeight: 600 }}>
-              Net Progress: {formatCurrency(netProgress)}
+              Principal Paid: {formatCurrency(principalPaid)}
               <span style={{ fontWeight: 400, fontSize: '0.8rem', display: 'block', opacity: 0.7 }}>
                 (Payment - Interest)
               </span>
@@ -412,10 +411,10 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
 
     // Color based on point type
     let fill = colors.accent; // accent for principal
-    if (payload.pointType === 'after_payment') {
-      fill = colors.payment; // green
-    } else if (payload.pointType === 'after_interest') {
+    if (payload.pointType === 'after_interest') {
       fill = colors.interest; // red
+    } else if (payload.pointType === 'after_payment') {
+      fill = colors.payment; // green
     }
 
     return (
@@ -490,11 +489,11 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data }) =>
       <div className="chart-legend">
         <div className="legend-item">
           <span className="legend-line green"></span>
-          <span>Payment (Balance Down)</span>
+          <span>Payment Applied (Down)</span>
         </div>
         <div className="legend-item">
           <span className="legend-line red"></span>
-          <span>Interest (Balance Up)</span>
+          <span>Interest Accrued (Up)</span>
         </div>
         {showCumulativeInterest && (
           <div className="legend-item">

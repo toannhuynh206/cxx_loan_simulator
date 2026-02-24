@@ -56,7 +56,7 @@ export const AmortizationTable: React.FC<AmortizationTableProps> = ({ data }) =>
       ...event,
       cumulativeInterest,
       paidOffPercent,
-      principalPaid: event.payment,
+      principalPaid: event.principalPaid ?? Math.max(0, event.payment - event.interest),
       netProgress: event.payment - event.interest,
       milestone,
     };

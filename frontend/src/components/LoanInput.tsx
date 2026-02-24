@@ -10,7 +10,8 @@ import {
   MortgageEntry,
   StudentLoanEntry,
 } from '../types/loan';
-import { PayoffStrategyType, STRATEGY_INFO } from '../types/payoffStrategy';
+import { PayoffStrategyType } from '../types/payoffStrategy';
+import { paymentForTerm } from '../utils/amortization';
 import { InfoTooltip, FIELD_DEFINITIONS } from './InfoTooltip';
 
 type StudentLoanMode = 'auto' | 'specify';
@@ -143,6 +144,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
   const [studentLoanBudget, setStudentLoanBudget] = useState<number>(500);
   const [studentLoanStrategy, setStudentLoanStrategy] = useState<PayoffStrategyType>('avalanche');
   const [showAllocation, setShowAllocation] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Inline editing state for loan names
   const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
@@ -176,16 +178,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
 
       // Calculate total minimum payment using Standard Repayment Plan
       const totalMin = sampleLoans.reduce((sum, loan) => {
-        const monthlyRate = loan.interestRate / 100 / 12;
-        const numPayments = 120;
-        let minPayment: number;
-        if (monthlyRate === 0) {
-          minPayment = loan.balance / numPayments;
-        } else {
-          minPayment = loan.balance * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))
-                     / (Math.pow(1 + monthlyRate, numPayments) - 1);
-        }
-        return sum + minPayment;
+        return sum + paymentForTerm(loan.balance, loan.interestRate, 120);
       }, 0);
 
       setStudentLoanBudget(Math.round(totalMin));
@@ -220,16 +213,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
 
     // Calculate minimum payments using Standard Repayment Plan (10-year fixed)
     const loansWithMinimums = sortedLoans.map(loan => {
-      const monthlyRate = loan.interestRate / 100 / 12;
-      const numPayments = 120; // 10 years
-
-      let minPayment: number;
-      if (monthlyRate === 0) {
-        minPayment = loan.balance / numPayments;
-      } else {
-        minPayment = loan.balance * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))
-                   / (Math.pow(1 + monthlyRate, numPayments) - 1);
-      }
+      const minPayment = paymentForTerm(loan.balance, loan.interestRate, 120);
 
       return { ...loan, calculatedMinPayment: Math.min(minPayment, loan.balance) };
     });
@@ -302,6 +286,28 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const invalidAutoLoans = loans['auto-loan'].filter((loan) => {
+      if (loan.balance <= 0) return false;
+      return (
+        loan.vehiclePrice <= 0 ||
+        loan.interestRate <= 0 ||
+        loan.interestRate > 100 ||
+        loan.termMonths <= 0 ||
+        loan.downPayment < 0 ||
+        loan.tradeInValue < 0 ||
+        loan.tradeInPayoff < 0
+      );
+    });
+
+    if (invalidAutoLoans.length > 0) {
+      setSubmitError(
+        'Auto loans require: vehicle price > 0, APR between 0 and 100, term > 0, and non-negative optional amounts.'
+      );
+      return;
+    }
+
+    setSubmitError(null);
     const allLoans = getAllLoans();
     if (allLoans.length > 0) {
       onCalculate(allLoans);
@@ -406,8 +412,8 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>Interest Rate</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.interestRate} />
+            <label>APR</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.apr} />
           </div>
           <div className="input-wrapper">
             <input
@@ -533,8 +539,8 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
         <div className="form-group">
           <div className="label-with-tooltip">
-            <label>Interest Rate</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.interestRate} />
+            <label>APR</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.apr} />
           </div>
           <div className="input-wrapper">
             <input
@@ -865,21 +871,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
   // Calculate minimum payment using Standard Repayment Plan (10-year fixed)
   // Formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
   const getRecommendedMinimum = (balance: number, interestRate: number): number => {
-    if (balance <= 0) return 0;
-
-    const monthlyRate = interestRate / 100 / 12;
-    const numPayments = 120; // 10 years = 120 months
-
-    // Handle 0% interest edge case
-    if (monthlyRate === 0) {
-      return balance / numPayments;
-    }
-
-    // Standard amortization formula
-    const payment = balance * (monthlyRate * Math.pow(1 + monthlyRate, numPayments))
-                  / (Math.pow(1 + monthlyRate, numPayments) - 1);
-
-    return Math.min(payment, balance);
+    return paymentForTerm(balance, interestRate, 120);
   };
 
   const renderStudentLoanFields = (loan: StudentLoanEntry) => {
@@ -1299,6 +1291,11 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         <div className="loan-input__summary">
           {getTotalLoans() > 0 && (
             <span>{getTotalLoans()} loan{getTotalLoans() !== 1 ? 's' : ''} added</span>
+          )}
+          {submitError && (
+            <span className="error-message" style={{ display: 'block', marginTop: 8 }}>
+              {submitError}
+            </span>
           )}
         </div>
         {(() => {

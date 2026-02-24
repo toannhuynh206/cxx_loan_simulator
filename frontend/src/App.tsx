@@ -9,6 +9,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { DebtPayoffStrategy } from './components/DebtPayoffStrategy';
 import { calculateMultipleLoans } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
+import { simulateSimpleAmortization } from './utils/amortization';
 import Logo from './assets/logo.svg';
 import './App.css';
 
@@ -89,42 +90,21 @@ function App() {
     if (!loanData) return null;
     if (sliderPayment === loanData.monthlyPayment) return loanData;
 
-    // Recalculate with slider payment
-    const events: MonthlyEvent[] = [];
-    let balance = loanData.principal;
-    let totalInterest = 0;
-    const monthlyRate = loanData.apr / 100 / 12;
-    let month = 0;
-    const maxMonths = 1200;
-
-    while (balance > 0.01 && month < maxMonths) {
-      month++;
-      const startBalance = balance;
-
-      // Payment first, then interest (matching backend algorithm)
-      const payment = Math.min(sliderPayment, balance);
-      balance -= payment;
-
-      const interest = balance * monthlyRate;
-      totalInterest += interest;
-      balance += interest;
-
-      events.push({
-        month,
-        startBalance,
-        interest,
-        payment,
-        endBalance: Math.max(0, balance),
-      });
-    }
+    const simulation = simulateSimpleAmortization({
+      principal: loanData.principal,
+      apr: loanData.apr,
+      monthlyPayment: sliderPayment,
+      maxMonths: 1200
+    });
+    const events: MonthlyEvent[] = simulation.events;
 
     return {
       principal: loanData.principal,
       apr: loanData.apr,
       monthlyPayment: sliderPayment,
       events,
-      totalMonths: month,
-      totalInterest,
+      totalMonths: simulation.months,
+      totalInterest: simulation.totalInterest,
     };
   }, [loanData, sliderPayment]);
 
@@ -204,7 +184,7 @@ function App() {
             <section className="card slider-section">
               <PaymentSlider
                 data={loanData}
-                multiLoanData={multiLoanData}
+                multiLoanData={multiLoanData ?? undefined}
                 sliderPayment={sliderPayment}
                 onPaymentChange={setSliderPayment}
               />
