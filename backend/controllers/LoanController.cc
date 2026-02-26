@@ -122,6 +122,60 @@ void LoanController::calculateMultiple(const HttpRequestPtr& req,
     }
 }
 
+void LoanController::calculateCascade(const HttpRequestPtr& req,
+                                       std::function<void(const HttpResponsePtr&)>&& callback) {
+    if (req->method() == Options) {
+        auto resp = HttpResponse::newHttpResponse();
+        resp->setStatusCode(k204NoContent);
+        callback(resp);
+        return;
+    }
+
+    try {
+        auto jsonPtr = req->getJsonObject();
+        if (!jsonPtr) {
+            Json::Value error;
+            error["error"] = "Invalid JSON body";
+            auto resp = HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(k400BadRequest);
+            callback(resp);
+            return;
+        }
+
+        auto request = loan::CascadeRequest::fromJson(*jsonPtr);
+
+        if (request.loans.empty()) {
+            Json::Value error;
+            error["error"] = "No loans provided";
+            auto resp = HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(k400BadRequest);
+            callback(resp);
+            return;
+        }
+        if (request.totalBudget <= 0) {
+            Json::Value error;
+            error["error"] = "totalBudget must be greater than 0";
+            auto resp = HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(k400BadRequest);
+            callback(resp);
+            return;
+        }
+
+        auto response = calculator_.calculateCascade(request);
+
+        auto resp = HttpResponse::newHttpJsonResponse(response.toJson());
+        resp->setStatusCode(k200OK);
+        callback(resp);
+
+    } catch (const std::exception& e) {
+        Json::Value error;
+        error["error"] = "Internal server error";
+        auto resp = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k500InternalServerError);
+        callback(resp);
+    }
+}
+
 void LoanController::healthCheck(const HttpRequestPtr& req,
                                   std::function<void(const HttpResponsePtr&)>&& callback) {
     Json::Value health;

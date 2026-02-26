@@ -295,7 +295,10 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
 
     // Auto loans use the actuarial monthly model: APR / 12
     double rate = installmentMonthlyRate(entry.interestRate);
-    double payment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
+    double calculatedPayment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
+    // Use provided payment if it exceeds the standard payment (e.g., extra allocation directed here).
+    // Never go below the amortization minimum — that would cause negative amortization.
+    double payment = (entry.monthlyPayment > calculatedPayment) ? entry.monthlyPayment : calculatedPayment;
     result.monthlyPayment = payment;
 
     double vehicleValue = entry.vehiclePrice;
@@ -492,6 +495,238 @@ LoanCalculationResult AmortizationCalculator::calculateLoan(const LoanEntry& ent
         result.totalMonths
     );
     return result;
+}
+
+// ============================================
+// CASCADE MINIMUM PAYMENT HELPER
+// ============================================
+double AmortizationCalculator::computeCascadeMinimum(
+    const LoanEntry& entry, double currentBalance) const
+{
+    const std::string& type = entry.type;
+
+    if (type == "credit-card") {
+        double pct   = entry.rawJson.get("minimumPaymentPercent", 2.0).asDouble() / 100.0;
+        double floor = entry.rawJson.get("minimumPaymentFloor", 25.0).asDouble();
+        return std::max(currentBalance * pct, floor);
+    }
+
+    // Installment loans: fixed amortization payment on original balance
+    double rate = installmentMonthlyRate(entry.interestRate);
+
+    if (type == "personal-loan") {
+        int term = entry.rawJson.get("termMonths", 36).asInt();
+        return calculateAmortizationPayment(entry.balance, rate, term);
+    }
+    if (type == "auto-loan") {
+        int term = entry.rawJson.get("termMonths", 60).asInt();
+        return calculateAmortizationPayment(entry.balance, rate, term);
+    }
+    if (type == "mortgage") {
+        int term = entry.rawJson.get("termYears", 30).asInt() * 12;
+        return calculateAmortizationPayment(entry.balance, rate, term);
+    }
+    if (type == "student-loan") {
+        std::string plan = entry.rawJson.get("repaymentPlan", "standard").asString();
+        int term = (plan == "extended") ? 300 : 120;
+        return calculateAmortizationPayment(entry.balance, rate, term);
+    }
+
+    // Fallback: use whatever payment was provided
+    return entry.monthlyPayment > 0 ? entry.monthlyPayment
+                                    : calculateAmortizationPayment(entry.balance, rate, 120);
+}
+
+// ============================================
+// CASCADE CALCULATION
+// ============================================
+MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest& request)
+{
+    const int MAX_MONTHS = 1200;
+    const double EPSILON  = 0.01;
+
+    const int n = static_cast<int>(request.loans.size());
+
+    // --- Per-loan working state ---
+    struct LoanState {
+        double balance;
+        double monthlyRate;
+        double originalMinimum;   // Fixed at start (except CC which recalcs)
+        double effectiveAPR;      // For avalanche sort
+        std::vector<MonthlyEvent> events;
+        double totalInterest;
+        double totalPaid;
+    };
+
+    std::vector<LoanState> states(n);
+    for (int i = 0; i < n; ++i) {
+        const LoanEntry& e = request.loans[i];
+        LoanState& s = states[i];
+        s.balance = e.balance;
+
+        // Credit card: APR lives in rawJson["apr"], NOT entry.interestRate
+        if (e.type == "credit-card") {
+            double apr = e.rawJson.get("apr", 0.0).asDouble();
+            s.monthlyRate = creditCardMonthlyRate(apr);
+            s.effectiveAPR = apr;
+        } else {
+            s.monthlyRate  = installmentMonthlyRate(e.interestRate);
+            s.effectiveAPR = e.interestRate;
+        }
+
+        s.originalMinimum = computeCascadeMinimum(e, e.balance);
+        s.totalInterest = 0.0;
+        s.totalPaid     = 0.0;
+    }
+
+    // --- Month-by-month simulation ---
+    for (int month = 1; month <= MAX_MONTHS; ++month) {
+        // Collect indices of still-active loans
+        std::vector<int> active;
+        for (int i = 0; i < n; ++i) {
+            if (states[i].balance > EPSILON) active.push_back(i);
+        }
+        if (active.empty()) break;
+
+        // Step 1: compute minimums for this month
+        std::vector<double> minimums(n, 0.0);
+        double totalMin = 0.0;
+        for (int i : active) {
+            if (request.loans[i].type == "credit-card") {
+                minimums[i] = computeCascadeMinimum(request.loans[i], states[i].balance);
+            } else {
+                minimums[i] = states[i].originalMinimum;
+            }
+            totalMin += minimums[i];
+        }
+
+        double extra = std::max(0.0, request.totalBudget - totalMin);
+
+        // Step 2: build priority order for extra allocation
+        std::vector<int> priority = active;
+        if (request.strategy == "avalanche") {
+            std::stable_sort(priority.begin(), priority.end(), [&](int a, int b) {
+                if (std::abs(states[a].effectiveAPR - states[b].effectiveAPR) > 1e-9)
+                    return states[a].effectiveAPR > states[b].effectiveAPR;
+                return states[a].balance < states[b].balance;  // tiebreak: smaller balance first
+            });
+        } else if (request.strategy == "snowball") {
+            std::stable_sort(priority.begin(), priority.end(), [&](int a, int b) {
+                if (std::abs(states[a].balance - states[b].balance) > 0.01)
+                    return states[a].balance < states[b].balance;
+                return states[a].effectiveAPR > states[b].effectiveAPR;  // tiebreak: higher APR
+            });
+        }
+        // "standard": no reordering, extra is split evenly below
+
+        // Step 3: allocate extra
+        std::vector<double> allocs(n);
+        for (int i : active) allocs[i] = minimums[i];
+
+        if (request.strategy == "standard") {
+            double extraPerLoan = active.size() > 0 ? extra / static_cast<double>(active.size()) : 0.0;
+            for (int i : active) allocs[i] += extraPerLoan;
+        } else {
+            double remaining = extra;
+            for (int i : priority) {
+                if (remaining <= EPSILON) break;
+                double interest  = states[i].balance * states[i].monthlyRate;
+                double maxPayoff = states[i].balance + interest;
+                double maxExtra  = maxPayoff - allocs[i];
+                if (maxExtra > EPSILON) {
+                    double toApply = std::min(remaining, maxExtra);
+                    allocs[i] += toApply;
+                    remaining  -= toApply;
+                }
+            }
+        }
+
+        // Step 4: apply payments and record events
+        for (int i = 0; i < n; ++i) {
+            double startBalance = states[i].balance;
+
+            MonthlyEvent evt{};
+            evt.month        = month;
+            evt.pmiPayment   = 0.0;
+            evt.escrowPayment = 0.0;
+
+            if (startBalance <= EPSILON) {
+                evt.startBalance  = 0.0;
+                evt.interest      = 0.0;
+                evt.payment       = 0.0;
+                evt.endBalance    = 0.0;
+                evt.principalPaid = 0.0;
+                evt.totalPayment  = 0.0;
+                states[i].events.push_back(evt);
+                continue;
+            }
+
+            double interest  = startBalance * states[i].monthlyRate;
+            double payment   = std::min(allocs[i], startBalance + interest);  // cap at full payoff
+            double endBalance = std::max(0.0, startBalance + interest - payment);
+
+            evt.startBalance  = startBalance;
+            evt.interest      = interest;
+            evt.payment       = payment;
+            evt.endBalance    = endBalance;
+            evt.principalPaid = payment - interest;
+            evt.totalPayment  = payment;
+
+            states[i].balance        = endBalance;
+            states[i].totalInterest += interest;
+            states[i].totalPaid     += payment;
+            states[i].events.push_back(evt);
+        }
+    }
+
+    // --- Build response ---
+    MultiLoanResponse response;
+    response.totalPrincipal      = 0.0;
+    response.totalInterest       = 0.0;
+    response.totalMonths         = 0;
+    response.totalMonthlyPayment = request.totalBudget;
+    response.totalPaid           = 0.0;
+
+    for (int i = 0; i < n; ++i) {
+        const LoanEntry& e = request.loans[i];
+        LoanState& s = states[i];
+
+        LoanCalculationResult result;
+        result.loanId        = e.id;
+        result.loanName      = e.name;
+        result.loanType      = e.type;
+        result.principal     = e.balance;
+        result.interestRate  = s.effectiveAPR;
+        result.monthlyPayment = s.originalMinimum;
+        result.minimumPayment = s.originalMinimum;
+        result.totalInterest = s.totalInterest;
+        result.totalPaid     = s.totalPaid;
+        result.totalPMI      = 0.0;
+        result.totalEscrow   = 0.0;
+        result.vehicleValue  = 0.0;
+        result.equityPercent = 0.0;
+
+        // Count actual months this loan was active (last event with non-zero payment)
+        int loanMonths = 0;
+        for (int m = static_cast<int>(s.events.size()) - 1; m >= 0; --m) {
+            if (s.events[m].payment > EPSILON || s.events[m].startBalance > EPSILON) {
+                loanMonths = m + 1;
+                break;
+            }
+        }
+        result.totalMonths = loanMonths;
+        result.events      = std::move(s.events);
+
+        response.totalPrincipal += e.balance;
+        response.totalInterest  += result.totalInterest;
+        response.totalPaid      += result.totalPaid;
+        if (result.totalMonths > response.totalMonths)
+            response.totalMonths = result.totalMonths;
+
+        response.loans.push_back(std::move(result));
+    }
+
+    return response;
 }
 
 } // namespace loan

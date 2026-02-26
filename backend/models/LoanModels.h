@@ -148,6 +148,7 @@ struct AutoLoanEntry {
     double tradeInPayoff;
     int vehicleYear;
     bool isUsed;
+    double monthlyPayment;  // Optional: if > calculated amortization, extra is applied to principal
 
     static AutoLoanEntry fromJson(const Json::Value& json) {
         AutoLoanEntry entry;
@@ -163,6 +164,7 @@ struct AutoLoanEntry {
         entry.tradeInPayoff = json.get("tradeInPayoff", 0.0).asDouble();
         entry.vehicleYear = json.get("vehicleYear", 2024).asInt();
         entry.isUsed = json.get("isUsed", false).asBool();
+        entry.monthlyPayment = json.get("monthlyPayment", 0.0).asDouble();
         return entry;
     }
 };
@@ -267,6 +269,25 @@ struct MultiLoanRequest {
         for (const auto& loanJson : loansArray) {
             req.loans.push_back(LoanEntry::fromJson(loanJson));
         }
+        return req;
+    }
+};
+
+// Cascade request: user commits to a fixed total monthly budget distributed
+// across loans by strategy. When a loan pays off, freed money rolls to the rest.
+struct CascadeRequest {
+    std::vector<LoanEntry> loans;
+    double totalBudget;
+    std::string strategy;  // "avalanche", "snowball", "standard"
+
+    static CascadeRequest fromJson(const Json::Value& json) {
+        CascadeRequest req;
+        const auto& loansArray = json["loans"];
+        for (const auto& loanJson : loansArray) {
+            req.loans.push_back(LoanEntry::fromJson(loanJson));
+        }
+        req.totalBudget = json["totalBudget"].asDouble();
+        req.strategy = json.get("strategy", "avalanche").asString();
         return req;
     }
 };

@@ -49,6 +49,10 @@ public:
     // Generic calculator that dispatches to specialized methods
     LoanCalculationResult calculateLoan(const LoanEntry& entry);
 
+    // Cascade calculator: fixed total budget distributed by strategy each month.
+    // When a loan pays off, its freed portion automatically rolls to remaining loans.
+    MultiLoanResponse calculateCascade(const CascadeRequest& request);
+
 private:
     // ----------------------------------------------------------
     // RATE HELPERS
@@ -89,6 +93,11 @@ private:
         double& totalPaid,
         int& totalMonths
     ) const;
+
+    // Compute the minimum required payment for a loan in the cascade simulation.
+    // Credit cards: recalculated monthly on current balance.
+    // Installment loans: fixed amortization payment computed from original principal.
+    double computeCascadeMinimum(const LoanEntry& entry, double currentBalance) const;
 
     // Validate input parameters
     bool validateInput(const LoanRequest& request, std::string& error);

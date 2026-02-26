@@ -20,6 +20,18 @@ export const calculateMultipleLoans = async (loans: LoanEntry[]): Promise<Combin
   return response.data;
 };
 
+export const calculateCascade = async (
+  loans: LoanEntry[],
+  totalBudget: number,
+  strategy: string
+): Promise<CombinedLoanResult> => {
+  const response = await apiClient.post<CombinedLoanResult>(
+    '/api/v1/loan/calculate-cascade',
+    { loans, totalBudget, strategy }
+  );
+  return response.data;
+};
+
 export const healthCheck = async (): Promise<boolean> => {
   try {
     await apiClient.get('/api/v1/health');

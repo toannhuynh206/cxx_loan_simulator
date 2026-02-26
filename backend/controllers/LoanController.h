@@ -13,6 +13,7 @@ public:
     METHOD_LIST_BEGIN
     ADD_METHOD_TO(LoanController::calculate, "/api/v1/loan/calculate", Post, Options);
     ADD_METHOD_TO(LoanController::calculateMultiple, "/api/v1/loan/calculate-multiple", Post, Options);
+    ADD_METHOD_TO(LoanController::calculateCascade, "/api/v1/loan/calculate-cascade", Post, Options);
     ADD_METHOD_TO(LoanController::healthCheck, "/api/v1/health", Get);
     METHOD_LIST_END
 
@@ -21,6 +22,9 @@ public:
 
     void calculateMultiple(const HttpRequestPtr& req,
                            std::function<void(const HttpResponsePtr&)>&& callback);
+
+    void calculateCascade(const HttpRequestPtr& req,
+                          std::function<void(const HttpResponsePtr&)>&& callback);
 
     void healthCheck(const HttpRequestPtr& req,
                      std::function<void(const HttpResponsePtr&)>&& callback);

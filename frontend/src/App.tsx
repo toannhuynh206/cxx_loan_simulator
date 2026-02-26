@@ -6,8 +6,9 @@ import { PaymentBreakdownChart } from './components/PaymentBreakdownChart';
 import { AmortizationTable } from './components/AmortizationTable';
 import { ThemeToggle } from './components/ThemeToggle';
 import { DebtPayoffStrategy } from './components/DebtPayoffStrategy';
-import { calculateMultipleLoans } from './services/loanApi';
+import { calculateMultipleLoans, calculateCascade } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
+import { PayoffStrategyType } from './types/payoffStrategy';
 import Logo from './assets/logo.svg';
 import './App.css';
 
@@ -75,17 +76,23 @@ function App() {
   }, [multiLoanData]);
 
 
-  const handleCalculate = async (loans: LoanEntry[]) => {
+  const handleCalculate = async (
+    loans: LoanEntry[],
+    budget: number,
+    strategy: PayoffStrategyType,
+    mode: 'auto' | 'specify'
+  ) => {
     setIsLoading(true);
     setError(null);
 
-    // Add artificial delay to show simulation is "thinking"
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     try {
       const [response] = await Promise.all([
-        calculateMultipleLoans(loans),
-        delay(2500) // 2.5 second minimum delay
+        mode === 'auto'
+          ? calculateCascade(loans, budget, strategy)
+          : calculateMultipleLoans(loans),
+        delay(2500)
       ]);
       setMultiLoanData(response);
     } catch (err: unknown) {

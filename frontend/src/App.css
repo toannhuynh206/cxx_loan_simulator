@@ -289,6 +289,22 @@ main {
   color: var(--color-text-primary);
 }
 
+.loan-tab--locked {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.loan-type-lock-notice {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--space-2) 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-secondary);
+  border-radius: var(--radius-sm);
+  border-left: 3px solid var(--color-accent);
+}
+
 .loan-tab__count {
   position: absolute;
   top: var(--space-1);

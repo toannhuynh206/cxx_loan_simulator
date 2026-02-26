@@ -14,7 +14,15 @@ interface DebtPayoffStrategyProps {
 }
 
 export const DebtPayoffStrategy: React.FC<DebtPayoffStrategyProps> = ({ loanData }) => {
-  const [extraPayment, setExtraPayment] = useState<number>(100);
+  // Seed extra payment from the budget surplus: what the user committed above minimums
+  const budgetSurplus = useMemo(() => {
+    const sumMins = loanData.loans.reduce(
+      (sum, l) => sum + (l.minimumPayment || l.monthlyPayment || 0), 0
+    );
+    return Math.max(0, Math.round(loanData.totalMonthlyPayment - sumMins));
+  }, [loanData]);
+
+  const [extraPayment, setExtraPayment] = useState<number>(() => budgetSurplus);
   const [selectedStrategy, setSelectedStrategy] = useState<PayoffStrategyType>('avalanche');
 
   // Calculate strategy comparison whenever inputs change

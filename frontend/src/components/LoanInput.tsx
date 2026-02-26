@@ -17,7 +17,7 @@ import { InfoTooltip, FIELD_DEFINITIONS } from './InfoTooltip';
 type StudentLoanMode = 'auto' | 'specify';
 
 interface LoanInputProps {
-  onCalculate: (loans: LoanEntry[]) => void;
+  onCalculate: (loans: LoanEntry[], budget: number, strategy: PayoffStrategyType, mode: 'auto' | 'specify') => void;
   isLoading: boolean;
 }
 
@@ -139,17 +139,24 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     'student-loan': [],
   });
 
-  // Student loan specific state
-  const [studentLoanMode, setStudentLoanMode] = useState<StudentLoanMode>('auto');
-  const [studentLoanBudget, setStudentLoanBudget] = useState<number>(500);
-  const [studentLoanStrategy, setStudentLoanStrategy] = useState<PayoffStrategyType>('avalanche');
+  // Generic allocation state — applies to whichever loan type is active
+  const [allocationMode, setAllocationMode] = useState<StudentLoanMode>('auto');
+  const [allocationBudget, setAllocationBudget] = useState<number>(0);
+  const [allocationStrategy, setAllocationStrategy] = useState<PayoffStrategyType>('avalanche');
   const [showAllocation, setShowAllocation] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Inline editing state for loan names
   const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
 
+  // Which loan type is currently in use (the type that has loans, or null if none).
+  // Enforces single-type constraint: once one type has loans, other tabs are locked.
+  const lockedType: LoanType | null =
+    (Object.keys(loans) as LoanType[]).find(type => loans[type].length > 0) ?? null;
+
   const addLoan = (type: LoanType) => {
+    // Enforce single loan type — no mixing allowed
+    if (lockedType !== null && type !== lockedType) return;
     setLoans(prev => {
       const newLoan = createEmptyLoan(type);
       const newIndex = prev[type].length + 1;
@@ -162,10 +169,15 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
   };
 
   const removeLoan = (type: LoanType, id: string) => {
-    setLoans(prev => ({
-      ...prev,
-      [type]: prev[type].filter(loan => loan.id !== id),
-    }));
+    setLoans(prev => {
+      const updated = prev[type].filter(loan => loan.id !== id);
+      // Reset allocation state when the last loan of this type is removed
+      if (updated.length === 0) {
+        setShowAllocation(false);
+        setAllocationBudget(0);
+      }
+      return { ...prev, [type]: updated };
+    });
   };
 
   const loadSampleData = (type: LoanType) => {
@@ -181,7 +193,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         return sum + paymentForTerm(loan.balance, loan.interestRate, 120);
       }, 0);
 
-      setStudentLoanBudget(Math.round(totalMin));
+      setAllocationBudget(Math.round(totalMin));
       setShowAllocation(false);
     }
   };
@@ -195,104 +207,112 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     }));
   };
 
-  // Calculate auto-allocated payments for student loans based on strategy
-  const getAutoAllocatedStudentLoans = (): StudentLoanEntry[] => {
-    const studentLoans = loans['student-loan'].filter(loan => loan.balance > 0);
-    if (studentLoans.length === 0 || studentLoanBudget <= 0) return studentLoans;
+  // Returns the effective annual interest rate for any loan type.
+  // Credit cards store their rate in `apr`; all others use `interestRate`.
+  const getEffectiveRate = (loan: LoanEntry): number =>
+    loan.type === 'credit-card' ? (loan as CreditCardEntry).apr : loan.interestRate;
 
-    // Sort loans based on strategy
-    const sortedLoans = [...studentLoans];
-    if (studentLoanStrategy === 'avalanche') {
-      // Highest interest rate first
-      sortedLoans.sort((a, b) => b.interestRate - a.interestRate);
-    } else if (studentLoanStrategy === 'snowball') {
-      // Smallest balance first
+  // Generic minimum payment for any loan type.
+  // Used for both the allocation algorithm and the manual-mode sliders.
+  const computeLoanMinimum = (loan: LoanEntry): number => {
+    switch (loan.type) {
+      case 'credit-card': {
+        const cc = loan as CreditCardEntry;
+        return Math.max(loan.balance * (cc.minimumPaymentPercent / 100), cc.minimumPaymentFloor);
+      }
+      case 'personal-loan':
+        return paymentForTerm(loan.balance, loan.interestRate, (loan as PersonalLoanEntry).termMonths || 60, 'personal-loan');
+      case 'auto-loan':
+        return paymentForTerm(loan.balance, loan.interestRate, (loan as AutoLoanEntry).termMonths || 60, 'auto-loan');
+      case 'mortgage': {
+        const termMonths = ((loan as MortgageEntry).termYears || 30) * 12;
+        return paymentForTerm(loan.balance, loan.interestRate, termMonths, 'mortgage');
+      }
+      case 'student-loan':
+      default:
+        return paymentForTerm(loan.balance, loan.interestRate, 120, 'student-loan');
+    }
+  };
+
+  // Auto-allocate a monthly budget across multiple loans of the same type.
+  // Algorithm: minimums to all first, then extra directed by strategy (avalanche/snowball/equal).
+  const getAutoAllocatedLoans = (type: LoanType): LoanEntry[] => {
+    const activeLoansOfType = loans[type].filter(loan => loan.balance > 0);
+    if (activeLoansOfType.length === 0 || allocationBudget <= 0) return activeLoansOfType;
+
+    // Sort by strategy
+    const sortedLoans = [...activeLoansOfType];
+    if (allocationStrategy === 'avalanche') {
+      sortedLoans.sort((a, b) => getEffectiveRate(b) - getEffectiveRate(a));
+    } else if (allocationStrategy === 'snowball') {
       sortedLoans.sort((a, b) => a.balance - b.balance);
     }
-    // 'standard' keeps original order
 
-    // Calculate minimum payments using Standard Repayment Plan (10-year fixed)
-    const loansWithMinimums = sortedLoans.map(loan => {
-      const minPayment = paymentForTerm(loan.balance, loan.interestRate, 120);
+    const loansWithMinimums = sortedLoans.map(loan => ({
+      ...loan,
+      calculatedMinPayment: Math.min(computeLoanMinimum(loan), loan.balance),
+    }));
 
-      return { ...loan, calculatedMinPayment: Math.min(minPayment, loan.balance) };
-    });
-
+    // Max payable in one month (prevents overpaying beyond balance + accrued interest)
+    const maxPayoff = (loan: LoanEntry) => loan.balance * (1 + getEffectiveRate(loan) / 100 / 12);
     const allocatedPayments = new Map<string, number>();
 
-    // Helper: max payable for a loan in one month (balance + one month's interest)
-    const maxPayoff = (loan: { balance: number; interestRate: number }) =>
-      loan.balance * (1 + loan.interestRate / 100 / 12);
+    if (allocationStrategy === 'standard') {
+      let remainingBudget = allocationBudget;
+      const active = loansWithMinimums.filter(l => l.balance > 0);
 
-    if (studentLoanStrategy === 'standard') {
-      // Pay minimums to all loans first, then distribute remaining budget evenly.
-      // Never underpay a loan — even split without minimums causes negative amortization.
-      let remainingBudget = studentLoanBudget;
-      const activeLoans = loansWithMinimums.filter(l => l.balance > 0);
-
-      // Step 1: minimums to all
-      for (const loan of activeLoans) {
-        const minPayment = Math.min(loan.calculatedMinPayment, remainingBudget, loan.balance);
-        allocatedPayments.set(loan.id, minPayment);
-        remainingBudget -= minPayment;
+      // Step 1: minimums to all — never underpay (avoids negative amortization)
+      for (const loan of active) {
+        const min = Math.min(loan.calculatedMinPayment, remainingBudget, loan.balance);
+        allocatedPayments.set(loan.id, min);
+        remainingBudget -= min;
       }
-
-      // Step 2: split remaining extra evenly
-      if (remainingBudget > 0 && activeLoans.length > 0) {
-        const extraPerLoan = remainingBudget / activeLoans.length;
-        for (const loan of activeLoans) {
-          const currentPayment = allocatedPayments.get(loan.id) ?? 0;
-          const extra = Math.min(extraPerLoan, Math.max(0, maxPayoff(loan) - currentPayment));
-          allocatedPayments.set(loan.id, currentPayment + extra);
+      // Step 2: distribute remaining extra evenly
+      if (remainingBudget > 0 && active.length > 0) {
+        const extraPerLoan = remainingBudget / active.length;
+        for (const loan of active) {
+          const current = allocatedPayments.get(loan.id) ?? 0;
+          const extra = Math.min(extraPerLoan, Math.max(0, maxPayoff(loan) - current));
+          allocatedPayments.set(loan.id, current + extra);
         }
       }
     } else {
-      // Avalanche or Snowball: minimums first, then extra to priority
-      let remainingBudget = studentLoanBudget;
-
-      // First, assign minimum payments to all loans
+      // Avalanche or Snowball: minimums to all, then extra to priority loan(s) in order
+      let remainingBudget = allocationBudget;
       for (const loan of loansWithMinimums) {
-        const minPayment = Math.min(loan.calculatedMinPayment, remainingBudget, loan.balance);
-        allocatedPayments.set(loan.id, minPayment);
-        remainingBudget -= minPayment;
+        const min = Math.min(loan.calculatedMinPayment, remainingBudget, loan.balance);
+        allocatedPayments.set(loan.id, min);
+        remainingBudget -= min;
       }
-
-      // Then, apply extra to priority loans in order
       for (const loan of loansWithMinimums) {
         if (remainingBudget <= 0) break;
-        const currentPayment = allocatedPayments.get(loan.id) || 0;
-        const extra = Math.min(remainingBudget, Math.max(0, maxPayoff(loan) - currentPayment));
-        allocatedPayments.set(loan.id, currentPayment + extra);
+        const current = allocatedPayments.get(loan.id) || 0;
+        const extra = Math.min(remainingBudget, Math.max(0, maxPayoff(loan) - current));
+        allocatedPayments.set(loan.id, current + extra);
         remainingBudget -= extra;
       }
     }
 
-    // Return loans with allocated payments
-    return studentLoans.map(loan => ({
+    return activeLoansOfType.map(loan => ({
       ...loan,
-      monthlyPayment: Math.round((allocatedPayments.get(loan.id) || 0) * 100) / 100
+      monthlyPayment: Math.round((allocatedPayments.get(loan.id) || 0) * 100) / 100,
     }));
   };
 
-  // Memoized auto-allocated student loans for display
-  const autoAllocatedStudentLoans = useMemo(() => {
-    if (studentLoanMode !== 'auto') return [];
-    return getAutoAllocatedStudentLoans();
-  }, [loans['student-loan'], studentLoanBudget, studentLoanStrategy, studentLoanMode]);
+  // Memoized allocated loans for the active tab
+  const autoAllocatedLoans = useMemo(() => {
+    if (allocationMode !== 'auto') return [] as LoanEntry[];
+    return getAutoAllocatedLoans(activeTab);
+  }, [loans, allocationBudget, allocationStrategy, allocationMode, activeTab]);
 
   const getAllLoans = (): LoanEntry[] => {
-    // For student loans in auto mode, use calculated payments
-    const processedStudentLoans = studentLoanMode === 'auto'
-      ? getAutoAllocatedStudentLoans()
-      : loans['student-loan'];
-
-    return [
-      ...processedStudentLoans,
-      ...loans['credit-card'],
-      ...loans['personal-loan'],
-      ...loans['auto-loan'],
-      ...loans['mortgage'],
-    ].filter(loan => loan.balance > 0);
+    if (lockedType === null) return [];
+    const validCount = loans[lockedType].filter(l => l.balance > 0).length;
+    // Use allocation for multi-loan auto mode; otherwise use raw entries
+    const processedLoans = allocationMode === 'auto' && validCount > 1
+      ? getAutoAllocatedLoans(lockedType)
+      : loans[lockedType];
+    return processedLoans.filter(loan => loan.balance > 0);
   };
 
   const getTotalLoans = () => {
@@ -323,9 +343,14 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     }
 
     setSubmitError(null);
-    const allLoans = getAllLoans();
-    if (allLoans.length > 0) {
-      onCalculate(allLoans);
+    const allLoans = loans[lockedType!].filter(l => l.balance > 0);
+    if (allLoans.length === 0) return;
+
+    if (allocationMode === 'auto' && allLoans.length > 1 && activeTab !== 'mortgage') {
+      onCalculate(allLoans, allocationBudget, allocationStrategy, 'auto');
+    } else {
+      // Specify mode or single loan or mortgage: use independent calculations
+      onCalculate(getAllLoans(), 0, 'avalanche', 'specify');
     }
   };
 
@@ -348,64 +373,73 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     }
   };
 
-  const renderCreditCardFields = (loan: CreditCardEntry) => (
-    <div className="loan-entry__fields">
-      <div className="form-group">
-        <div className="label-with-tooltip">
-          <label>Current Balance</label>
-          <InfoTooltip {...FIELD_DEFINITIONS.balance} />
+  const renderCreditCardFields = (loan: CreditCardEntry) => {
+    // Hide individual payment field when multiple loans exist — the allocation section controls it
+    const showPaymentField = loans['credit-card'].filter(l => l.balance > 0).length <= 1;
+    return (
+      <div className="loan-entry__fields">
+        <div className="form-group">
+          <div className="label-with-tooltip">
+            <label>Current Balance</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.balance} />
+          </div>
+          <div className="input-wrapper">
+            <span className="input-prefix">$</span>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={loan.balance || ''}
+              onChange={(e) => updateLoan('credit-card', loan.id, 'balance', parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
+            />
+          </div>
         </div>
-        <div className="input-wrapper">
-          <span className="input-prefix">$</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={loan.balance || ''}
-            onChange={(e) => updateLoan('credit-card', loan.id, 'balance', parseFloat(e.target.value) || 0)}
-            placeholder="0.00"
-          />
+        <div className="form-group">
+          <div className="label-with-tooltip">
+            <label>APR</label>
+            <InfoTooltip {...FIELD_DEFINITIONS.apr} />
+          </div>
+          <div className="input-wrapper">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max="100"
+              value={loan.apr || ''}
+              onChange={(e) => updateLoan('credit-card', loan.id, 'apr', parseFloat(e.target.value) || 0)}
+              placeholder="0.00"
+            />
+            <span className="input-suffix">%</span>
+          </div>
         </div>
+        {showPaymentField && (
+          <div className="form-group">
+            <div className="label-with-tooltip">
+              <label>Monthly Payment</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
+            </div>
+            <div className="input-wrapper">
+              <span className="input-prefix">$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={loan.monthlyPayment || ''}
+                onChange={(e) => updateLoan('credit-card', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+        )}
       </div>
-      <div className="form-group">
-        <div className="label-with-tooltip">
-          <label>APR</label>
-          <InfoTooltip {...FIELD_DEFINITIONS.apr} />
-        </div>
-        <div className="input-wrapper">
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
-            value={loan.apr || ''}
-            onChange={(e) => updateLoan('credit-card', loan.id, 'apr', parseFloat(e.target.value) || 0)}
-            placeholder="0.00"
-          />
-          <span className="input-suffix">%</span>
-        </div>
-      </div>
-      <div className="form-group">
-        <div className="label-with-tooltip">
-          <label>Monthly Payment</label>
-          <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
-        </div>
-        <div className="input-wrapper">
-          <span className="input-prefix">$</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0"
-            value={loan.monthlyPayment || ''}
-            onChange={(e) => updateLoan('credit-card', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
-            placeholder="0.00"
-          />
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
-  const renderPersonalLoanFields = (loan: PersonalLoanEntry) => (
+  const renderPersonalLoanFields = (loan: PersonalLoanEntry) => {
+    // Hide individual payment field when multiple loans exist — allocation section controls it
+    const showPaymentField = loans['personal-loan'].filter(l => l.balance > 0).length <= 1;
+    return (
     <>
       <div className="loan-entry__fields">
         <div className="form-group">
@@ -466,23 +500,25 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
       </div>
       <div className="loan-entry__fields loan-entry__fields--secondary">
-        <div className="form-group">
-          <div className="label-with-tooltip">
-            <label>Monthly Payment</label>
-            <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
+        {showPaymentField && (
+          <div className="form-group">
+            <div className="label-with-tooltip">
+              <label>Monthly Payment</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
+            </div>
+            <div className="input-wrapper">
+              <span className="input-prefix">$</span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={loan.monthlyPayment || ''}
+                onChange={(e) => updateLoan('personal-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
+                placeholder="Auto-calculated"
+              />
+            </div>
           </div>
-          <div className="input-wrapper">
-            <span className="input-prefix">$</span>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={loan.monthlyPayment || ''}
-              onChange={(e) => updateLoan('personal-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
-              placeholder="Auto-calculated"
-            />
-          </div>
-        </div>
+        )}
         <div className="form-group">
           <div className="label-with-tooltip">
             <label>Origination Fee</label>
@@ -503,7 +539,8 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         </div>
       </div>
     </>
-  );
+    );
+  };
 
   const renderAutoLoanFields = (loan: AutoLoanEntry) => (
     <>
@@ -883,11 +920,9 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     );
   };
 
-  // Calculate minimum payment using Standard Repayment Plan (10-year fixed)
-  // Formula: M = P * [r(1+r)^n] / [(1+r)^n - 1]
-  const getRecommendedMinimum = (balance: number, interestRate: number): number => {
-    return paymentForTerm(balance, interestRate, 120);
-  };
+  // getRecommendedMinimum kept as a thin wrapper for backward compat within this file
+  const getRecommendedMinimum = (balance: number, interestRate: number): number =>
+    paymentForTerm(balance, interestRate, 120);
 
   const renderStudentLoanFields = (loan: StudentLoanEntry) => {
     return (
@@ -939,15 +974,23 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       </div>
 
       {/* Loan Type Tabs */}
+      {lockedType && (
+        <p className="loan-type-lock-notice">
+          Remove all {LOAN_TYPES.find(t => t.id === lockedType)?.label}s to switch to a different loan type.
+        </p>
+      )}
       <div className="loan-tabs">
         {LOAN_TYPES.map(type => {
           const count = loans[type.id].length;
+          const isLocked = lockedType !== null && type.id !== lockedType;
           return (
             <button
               key={type.id}
-              className={`loan-tab ${activeTab === type.id ? 'loan-tab--active' : ''}`}
-              onClick={() => setActiveTab(type.id)}
+              className={`loan-tab ${activeTab === type.id ? 'loan-tab--active' : ''} ${isLocked ? 'loan-tab--locked' : ''}`}
+              onClick={() => { if (!isLocked) setActiveTab(type.id); }}
               type="button"
+              disabled={isLocked}
+              title={isLocked ? `Remove all ${LOAN_TYPES.find(t => t.id === lockedType)?.label?.toLowerCase()}s to switch types` : undefined}
             >
               <span className="loan-tab__icon">{type.icon}</span>
               <span className="loan-tab__label">{type.label}</span>
@@ -1048,17 +1091,25 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           </div>
         )}
 
-        {/* Student Loan Payment Options - shown after loans are entered */}
-        {activeTab === 'student-loan' && activeLoans.length > 0 && (() => {
-          const validLoans = activeLoans.filter((l): l is StudentLoanEntry =>
-            l.type === 'student-loan' && l.balance > 0 && l.interestRate > 0
-          );
-          const totalMinPayment = validLoans.reduce((sum, l) =>
-            sum + getRecommendedMinimum(l.balance, l.interestRate), 0
-          );
+        {/* Payment Options — shown for all loan types except mortgage */}
+        {activeTab !== 'mortgage' && activeLoans.length > 0 && (() => {
+          const validLoans = activeLoans.filter(l => l.balance > 0 && getEffectiveRate(l) > 0);
+          const totalMinPayment = validLoans.reduce((sum, l) => sum + computeLoanMinimum(l), 0);
           const hasValidLoans = validLoans.length > 0;
 
           if (!hasValidLoans) return null;
+
+          // Min label and tooltip adapt to loan type
+          const minTooltipTitle =
+            activeTab === 'credit-card' ? '2% Minimum' :
+            activeTab === 'student-loan' ? 'Standard Repayment Plan' :
+            'Loan Term Payment';
+          const minTooltipBody =
+            activeTab === 'credit-card'
+              ? 'Credit card minimum is 2% of the current balance (floor $25). This decreases as you pay off the balance.'
+              : activeTab === 'student-loan'
+              ? 'Minimum is based on the federal 10-year fixed payment plan — the default repayment schedule for federal student loans.'
+              : 'Minimum is the standard amortization payment calculated from your loan balance, rate, and term.';
 
           return (
             <div className="student-loan-payment-section">
@@ -1070,8 +1121,8 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 <div className="payment-mode-option">
                   <button
                     type="button"
-                    className={`payment-mode-btn ${studentLoanMode === 'auto' ? 'payment-mode-btn--active' : ''}`}
-                    onClick={() => setStudentLoanMode('auto')}
+                    className={`payment-mode-btn ${allocationMode === 'auto' ? 'payment-mode-btn--active' : ''}`}
+                    onClick={() => setAllocationMode('auto')}
                   >
                     Auto-allocate
                   </button>
@@ -1082,8 +1133,8 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 <div className="payment-mode-option">
                   <button
                     type="button"
-                    className={`payment-mode-btn ${studentLoanMode === 'specify' ? 'payment-mode-btn--active' : ''}`}
-                    onClick={() => setStudentLoanMode('specify')}
+                    className={`payment-mode-btn ${allocationMode === 'specify' ? 'payment-mode-btn--active' : ''}`}
+                    onClick={() => setAllocationMode('specify')}
                   >
                     Manual
                   </button>
@@ -1093,7 +1144,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 </div>
               </div>
 
-              {studentLoanMode === 'auto' && (
+              {allocationMode === 'auto' && (
                 <div className="split-budget-form">
                   <div className="budget-input-row">
                     <div className="budget-field">
@@ -1104,9 +1155,9 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                           type="number"
                           step="10"
                           min="0"
-                          value={studentLoanBudget || ''}
+                          value={allocationBudget || ''}
                           onChange={(e) => {
-                            setStudentLoanBudget(parseFloat(e.target.value) || 0);
+                            setAllocationBudget(parseFloat(e.target.value) || 0);
                             setShowAllocation(false);
                           }}
                           placeholder={Math.round(totalMinPayment).toString()}
@@ -1119,90 +1170,91 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                         <div className="budget-minimum-tooltip">
                           <span className="budget-minimum-info">ⓘ</span>
                           <div className="budget-minimum-tooltip-content">
-                            <strong>Standard Repayment Plan</strong>
-                            <p>Minimum is based on the federal 10-year fixed payment plan — the default repayment schedule for federal student loans.</p>
+                            <strong>{minTooltipTitle}</strong>
+                            <p>{minTooltipBody}</p>
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    <div className="strategy-field">
-                      <label>Strategy</label>
-                      <div className="strategy-select-buttons">
-                        <div className="strategy-btn-wrap">
-                          <button
-                            type="button"
-                            className={`strategy-select-btn ${studentLoanStrategy === 'avalanche' ? 'strategy-select-btn--active' : ''}`}
-                            onClick={() => setStudentLoanStrategy('avalanche')}
-                          >
-                            <span className="strategy-icon">⛰️</span>
-                            <span className="strategy-name">Avalanche</span>
-                            <span className="strategy-desc">Highest rate first</span>
-                          </button>
-                          <div className="strategy-hover-tooltip">
-                            <strong>Avalanche Method</strong>
-                            <p>Pay minimums on all loans, put extra toward the highest interest rate first. Saves you the most money over time.</p>
+                    {validLoans.length > 1 && (
+                      <div className="strategy-field">
+                        <label>Strategy</label>
+                        <div className="strategy-select-buttons">
+                          <div className="strategy-btn-wrap">
+                            <button
+                              type="button"
+                              className={`strategy-select-btn ${allocationStrategy === 'avalanche' ? 'strategy-select-btn--active' : ''}`}
+                              onClick={() => setAllocationStrategy('avalanche')}
+                            >
+                              <span className="strategy-icon">⛰️</span>
+                              <span className="strategy-name">Avalanche</span>
+                              <span className="strategy-desc">Highest rate first</span>
+                            </button>
+                            <div className="strategy-hover-tooltip">
+                              <strong>Avalanche Method</strong>
+                              <p>Pay minimums on all loans, put extra toward the highest interest rate first. Saves you the most money over time.</p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="strategy-btn-wrap">
-                          <button
-                            type="button"
-                            className={`strategy-select-btn ${studentLoanStrategy === 'snowball' ? 'strategy-select-btn--active' : ''}`}
-                            onClick={() => setStudentLoanStrategy('snowball')}
-                          >
-                            <span className="strategy-icon">❄️</span>
-                            <span className="strategy-name">Snowball</span>
-                            <span className="strategy-desc">Smallest balance first</span>
-                          </button>
-                          <div className="strategy-hover-tooltip">
-                            <strong>Snowball Method</strong>
-                            <p>Pay minimums on all loans, put extra toward the smallest balance first. Quick wins keep you motivated.</p>
+                          <div className="strategy-btn-wrap">
+                            <button
+                              type="button"
+                              className={`strategy-select-btn ${allocationStrategy === 'snowball' ? 'strategy-select-btn--active' : ''}`}
+                              onClick={() => setAllocationStrategy('snowball')}
+                            >
+                              <span className="strategy-icon">❄️</span>
+                              <span className="strategy-name">Snowball</span>
+                              <span className="strategy-desc">Smallest balance first</span>
+                            </button>
+                            <div className="strategy-hover-tooltip">
+                              <strong>Snowball Method</strong>
+                              <p>Pay minimums on all loans, put extra toward the smallest balance first. Quick wins keep you motivated.</p>
+                            </div>
                           </div>
-                        </div>
-                        <div className="strategy-btn-wrap">
-                          <button
-                            type="button"
-                            className={`strategy-select-btn ${studentLoanStrategy === 'standard' ? 'strategy-select-btn--active' : ''}`}
-                            onClick={() => setStudentLoanStrategy('standard')}
-                          >
-                            <span className="strategy-icon">📊</span>
-                            <span className="strategy-name">Equal</span>
-                            <span className="strategy-desc">Split evenly</span>
-                          </button>
-                          <div className="strategy-hover-tooltip">
-                            <strong>Equal Split</strong>
-                            <p>Divide your budget equally across all loans. Simple and easy to track.</p>
+                          <div className="strategy-btn-wrap">
+                            <button
+                              type="button"
+                              className={`strategy-select-btn ${allocationStrategy === 'standard' ? 'strategy-select-btn--active' : ''}`}
+                              onClick={() => setAllocationStrategy('standard')}
+                            >
+                              <span className="strategy-icon">📊</span>
+                              <span className="strategy-name">Equal</span>
+                              <span className="strategy-desc">Split evenly</span>
+                            </button>
+                            <div className="strategy-hover-tooltip">
+                              <strong>Equal Split</strong>
+                              <p>Divide your budget equally across all loans. Simple and easy to track.</p>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Allocation Preview */}
-                  {showAllocation && studentLoanBudget > 0 && (
+                  {showAllocation && allocationBudget > 0 && (
                     <div className="allocation-preview">
                       <div className="allocation-header">
                         <h5>Payment Allocation</h5>
                         <span className="allocation-strategy">
-                          {studentLoanStrategy === 'avalanche' && '⛰️ Avalanche'}
-                          {studentLoanStrategy === 'snowball' && '❄️ Snowball'}
-                          {studentLoanStrategy === 'standard' && '📊 Equal Split'}
+                          {allocationStrategy === 'avalanche' && '⛰️ Avalanche'}
+                          {allocationStrategy === 'snowball' && '❄️ Snowball'}
+                          {allocationStrategy === 'standard' && '📊 Equal Split'}
                         </span>
                       </div>
                       <div className="allocation-list">
-                        {autoAllocatedStudentLoans
+                        {autoAllocatedLoans
                           .filter(loan => loan.balance > 0)
                           .map((loan, index) => {
-                            const percentage = (loan.monthlyPayment / studentLoanBudget) * 100;
-                            // Find original index for fallback name
-                            const originalIndex = loans['student-loan'].findIndex(l => l.id === loan.id);
+                            const percentage = (loan.monthlyPayment / allocationBudget) * 100;
+                            const originalIndex = loans[activeTab].findIndex(l => l.id === loan.id);
                             const displayName = loan.name || `Loan ${originalIndex >= 0 ? originalIndex + 1 : index + 1}`;
                             return (
                               <div key={loan.id} className="allocation-item">
                                 <div className="allocation-item__info">
                                   <span className="allocation-item__name">{displayName}</span>
                                   <span className="allocation-item__details">
-                                    ${loan.balance.toLocaleString()} @ {loan.interestRate}%
+                                    ${loan.balance.toLocaleString()} @ {getEffectiveRate(loan)}%
                                   </span>
                                 </div>
                                 <div className="allocation-item__bar-container">
@@ -1221,14 +1273,14 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                       </div>
                       <div className="allocation-total">
                         <span>Total Monthly Payment</span>
-                        <strong>${studentLoanBudget.toLocaleString()}</strong>
+                        <strong>${allocationBudget.toLocaleString()}</strong>
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {studentLoanMode === 'specify' && (
+              {allocationMode === 'specify' && (
                 <div className="manual-allocation">
                   <div className="allocation-header">
                     <h5>Set Your Payments</h5>
@@ -1236,13 +1288,12 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                   </div>
                   <div className="allocation-list">
                     {validLoans.map((loan, index) => {
-                      const minPayment = getRecommendedMinimum(loan.balance, loan.interestRate);
+                      const minPayment = computeLoanMinimum(loan);
                       const maxPayment = loan.balance;
                       const currentPayment = loan.monthlyPayment || minPayment;
                       const range = maxPayment - minPayment;
                       const percentage = range > 0 ? ((currentPayment - minPayment) / range) * 100 : 0;
-                      // Find original index for fallback name
-                      const originalIndex = loans['student-loan'].findIndex(l => l.id === loan.id);
+                      const originalIndex = loans[activeTab].findIndex(l => l.id === loan.id);
                       const displayName = loan.name || `Loan ${originalIndex >= 0 ? originalIndex + 1 : index + 1}`;
 
                       return (
@@ -1250,7 +1301,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                           <div className="allocation-item__info">
                             <span className="allocation-item__name">{displayName}</span>
                             <span className="allocation-item__details">
-                              ${loan.balance.toLocaleString()} @ {loan.interestRate}%
+                              ${loan.balance.toLocaleString()} @ {getEffectiveRate(loan)}%
                             </span>
                             <span className="allocation-item__min">
                               Min: ${Math.round(minPayment)}/mo
@@ -1263,7 +1314,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                               max={Math.round(maxPayment)}
                               step="10"
                               value={currentPayment}
-                              onChange={(e) => updateLoan('student-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value))}
+                              onChange={(e) => updateLoan(activeTab, loan.id, 'monthlyPayment', parseFloat(e.target.value))}
                               className="allocation-slider"
                             />
                             <div
@@ -1279,7 +1330,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                               max={Math.round(maxPayment)}
                               step="10"
                               value={Math.round(currentPayment)}
-                              onChange={(e) => updateLoan('student-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value) || minPayment)}
+                              onChange={(e) => updateLoan(activeTab, loan.id, 'monthlyPayment', parseFloat(e.target.value) || minPayment)}
                               className="amount-input"
                             />
                             <span>/mo</span>
@@ -1291,7 +1342,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                   <div className="allocation-total">
                     <span>Total Monthly Payment</span>
                     <strong>
-                      ${validLoans.reduce((sum, l) => sum + (l.monthlyPayment || getRecommendedMinimum(l.balance, l.interestRate)), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                      ${validLoans.reduce((sum, l) => sum + (l.monthlyPayment || computeLoanMinimum(l)), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                     </strong>
                   </div>
                 </div>
@@ -1314,7 +1365,8 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           )}
         </div>
         {(() => {
-          const needsAllocation = activeTab === 'student-loan' && studentLoanMode === 'auto' && !showAllocation;
+          const validCount = lockedType ? loans[lockedType].filter(l => l.balance > 0).length : 0;
+          const needsAllocation = allocationMode === 'auto' && validCount > 1 && !showAllocation && activeTab !== 'mortgage';
           const hasValidLoans = getAllLoans().length > 0;
 
           return (
