@@ -2,7 +2,7 @@
 
 **Visualize your loans. Strategize your path to financial freedom.**
 
-LoanScope is a full-stack loan simulation tool that models amortization schedules across multiple loan types simultaneously. It uses a C++ calculation engine for mathematically accurate interest modeling and provides an interactive React frontend for exploring payoff strategies, viewing per-loan breakdowns, and comparing debt elimination approaches.
+LoanScope is a full-stack loan simulation tool that models amortization schedules across multiple loan types simultaneously. It uses a C++ calculation engine for mathematically accurate interest modeling and provides an interactive React frontend for exploring payoff strategies, viewing per-loan breakdowns, and comparing debt elimination approaches. User 
 
 ---
 
