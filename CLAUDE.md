@@ -1,7 +1,7 @@
 <!-- gitnexus:start -->
 # GitNexus MCP
 
-This project is indexed by GitNexus as **loan_simulation** (265 symbols, 528 relationships, 14 execution flows).
+mThis project is indexed by GitNexus as **loan_simulation** (274 symbols, 544 relationships, 14 execution flows).
 
 GitNexus provides a knowledge graph over this codebase — call chains, blast radius, execution flows, and semantic search.
 

@@ -56,7 +56,7 @@
 // STUDENT LOAN SPECIFICS
 //   - Standard plan: 120-month term (10 years).
 //   - Extended plan: 300-month term (25 years).
-//   - Graduated/income-driven: defaults to 300-month term.
+//   - Graduated: 120-month term (same as standard — 10 years).
 //   - Payment is calculated via amortization formula if not provided.
 //
 // ============================================================
@@ -79,7 +79,9 @@ bool AmortizationCalculator::validateInput(const LoanRequest& request, std::stri
         return false;
     }
 
-    // Check payment covers at least the first month's interest (APR/12 model)
+    // Check payment covers at least the first month's interest.
+    // This legacy endpoint uses the actuarial monthly model (APR/12) only — it is
+    // not used for credit cards (which go through calculate-multiple or calculate-cascade).
     double firstMonthInterest = request.principal * installmentMonthlyRate(request.apr);
     if (request.monthlyPayment <= firstMonthInterest) {
         error = "Monthly payment must exceed monthly interest ($" +
@@ -439,11 +441,14 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
     result.monthlyPayment = payment;
     result.minimumPayment = payment;
 
+    // Allow 12 months past the stated term as a rounding buffer.
+    // If a manually-set payment is below the amortization minimum, the schedule
+    // will stop at termMonths + 12 rather than running indefinitely.
     buildSimpleSchedule(
         entry.balance,
         rate,
         payment,
-        termMonths + 60,
+        termMonths + 12,
         result.events,
         result.totalInterest,
         result.totalPaid,
@@ -577,6 +582,21 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
         s.originalMinimum = computeCascadeMinimum(e, e.balance);
         s.totalInterest = 0.0;
         s.totalPaid     = 0.0;
+    }
+
+    // --- Budget validation: ensure totalBudget covers all first-month minimums ---
+    {
+        double firstMonthMin = 0.0;
+        for (int i = 0; i < n; ++i) {
+            firstMonthMin += states[i].originalMinimum;
+        }
+        if (request.totalBudget < firstMonthMin - EPSILON) {
+            throw std::invalid_argument(
+                "totalBudget (" + std::to_string(static_cast<int>(request.totalBudget)) +
+                ") is less than the sum of all loan minimums (" +
+                std::to_string(static_cast<int>(std::ceil(firstMonthMin))) + ")."
+            );
+        }
     }
 
     // --- Month-by-month simulation ---

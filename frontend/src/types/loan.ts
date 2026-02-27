@@ -99,6 +99,7 @@ export interface MortgageEntry extends BaseLoanEntry {
 export interface StudentLoanEntry extends BaseLoanEntry {
   type: 'student-loan';
   interestRate: number; // Fixed rate
+  repaymentPlan?: 'standard' | 'extended' | 'graduated'; // Defaults to 'standard' (120 months)
 }
 
 export type LoanEntry = CreditCardEntry | PersonalLoanEntry | AutoLoanEntry | MortgageEntry | StudentLoanEntry;

@@ -253,8 +253,13 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       calculatedMinPayment: Math.min(computeLoanMinimum(loan), loan.balance),
     }));
 
-    // Max payable in one month (prevents overpaying beyond balance + accrued interest)
-    const maxPayoff = (loan: LoanEntry) => loan.balance * (1 + getEffectiveRate(loan) / 100 / 12);
+    // Max payable in one month (prevents overpaying beyond balance + accrued interest).
+    // Credit cards use APR/365×30 (daily accrual); installment loans use APR/12.
+    const maxPayoff = (loan: LoanEntry) => {
+      const rate = getEffectiveRate(loan) / 100;
+      const monthlyRate = loan.type === 'credit-card' ? rate / 365 * 30 : rate / 12;
+      return loan.balance * (1 + monthlyRate);
+    };
     const allocatedPayments = new Map<string, number>();
 
     if (allocationStrategy === 'standard') {

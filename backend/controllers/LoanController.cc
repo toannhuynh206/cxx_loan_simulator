@@ -167,6 +167,13 @@ void LoanController::calculateCascade(const HttpRequestPtr& req,
         resp->setStatusCode(k200OK);
         callback(resp);
 
+    } catch (const std::invalid_argument& e) {
+        Json::Value error;
+        error["error"] = e.what();
+        auto resp = HttpResponse::newHttpJsonResponse(error);
+        resp->setStatusCode(k400BadRequest);
+        callback(resp);
+
     } catch (const std::exception& e) {
         Json::Value error;
         error["error"] = "Internal server error";

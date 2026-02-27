@@ -1,4 +1,191 @@
 /* ============================================
+   VIEW MODE TOGGLE  (Combined / Per Loan)
+   ============================================ */
+
+.view-mode-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+/* Use higher specificity so we beat .chart-controls button (0-1-1) */
+.view-mode-toggle .view-mode-btn {
+  position: relative;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  white-space: nowrap;
+  min-height: unset;
+  line-height: 1.4;
+}
+
+.view-mode-toggle .view-mode-btn:hover:not(.active) {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+  border-color: transparent;
+}
+
+.view-mode-toggle .view-mode-btn.active {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.18);
+  border-color: transparent;
+}
+
+/* ============================================
+   PER-LOAN LEGEND  (chart)
+   ============================================ */
+
+.per-loan-legend {
+  flex-wrap: wrap;
+  gap: 12px 20px;
+}
+
+.legend-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-payoff {
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0.85;
+  margin-left: 2px;
+}
+
+/* ============================================
+   LOAN TABS  (per-loan table)
+   ============================================ */
+
+.per-loan-table-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.loan-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0;
+  padding: 0 2px;
+  overflow-x: auto;
+}
+
+.loan-tab {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 18px 10px 14px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  white-space: nowrap;
+  margin-bottom: -1px;
+  border-radius: 6px 6px 0 0;
+}
+
+.loan-tab:hover:not(.active) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.loan-tab.active {
+  font-weight: 600;
+  background: var(--color-bg-secondary);
+}
+
+.loan-tab-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.loan-tab-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.loan-tab-meta {
+  font-size: 0.72rem;
+  font-weight: 500;
+  opacity: 0.7;
+  background: var(--color-bg-tertiary);
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* ── Loan stats bar under tabs ── */
+
+.loan-tab-stats {
+  display: flex;
+  gap: 0;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.loan-tab-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 12px;
+  border-right: 1px solid var(--color-border);
+  gap: 2px;
+}
+
+.loan-tab-stat:last-child {
+  border-right: none;
+}
+
+.loan-tab-stat .stat-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+
+.loan-tab-stat .stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.loan-tab-stat .stat-value.interest {
+  color: var(--color-error);
+}
+
+/* ── Per-loan table top border accent ── */
+.loan-table-view {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ============================================
    APP LAYOUT
    ============================================ */
 
@@ -2498,6 +2685,17 @@ main {
   margin-bottom: var(--space-5);
 }
 
+.chart-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.chart-title-row h3 {
+  margin: 0;
+}
+
 .chart-controls {
   display: flex;
   align-items: center;
@@ -2505,18 +2703,31 @@ main {
   flex-wrap: wrap;
 }
 
-.pan-controls,
-.zoom-controls {
+.window-control {
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-.range-label {
-  font-size: 0.9375rem;
+.window-slider {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 140px;
+}
+
+.window-slider input[type="range"] {
+  width: 100%;
+  height: 4px;
+  cursor: pointer;
+  accent-color: var(--color-accent);
+}
+
+.window-label {
+  font-size: 0.75rem;
   color: var(--color-text-tertiary);
-  min-width: 120px;
-  text-align: center;
+  white-space: nowrap;
 }
 
 /* Chart Buttons */
@@ -3860,15 +4071,17 @@ footer {
     gap: var(--space-3);
   }
 
-  .pan-controls,
-  .zoom-controls {
+  .window-control {
     justify-content: space-between;
     width: 100%;
   }
 
-  .pan-controls button,
-  .zoom-controls button {
+  .window-slider {
     flex: 1;
+    min-width: 0;
+  }
+
+  .window-control button {
     min-height: 48px;
     font-size: 1rem;
   }

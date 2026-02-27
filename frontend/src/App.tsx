@@ -17,11 +17,13 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resetKey, setResetKey] = useState<number>(0);
+  const [viewMode, setViewMode] = useState<'combined' | 'per-loan'>('per-loan');
 
   // Reset all state to initial values
   const handleReset = () => {
     setMultiLoanData(null);
     setError(null);
+    setViewMode('per-loan');
     setResetKey(prev => prev + 1); // Force LoanInput to remount
   };
 
@@ -37,6 +39,7 @@ function App() {
       let totalStartBalance = 0;
       let totalInterest = 0;
       let totalPayment = 0;
+      let totalCashOutflow = 0;
       let totalEndBalance = 0;
 
       for (const loan of multiLoanData.loans) {
@@ -45,6 +48,8 @@ function App() {
           totalStartBalance += event.startBalance;
           totalInterest += event.interest;
           totalPayment += event.payment;
+          // totalPayment on the event includes PMI + escrow for mortgages
+          totalCashOutflow += event.totalPayment ?? event.payment;
           totalEndBalance += event.endBalance;
         }
       }
@@ -55,15 +60,18 @@ function App() {
           startBalance: totalStartBalance,
           interest: totalInterest,
           payment: totalPayment,
+          totalPayment: totalCashOutflow,
           endBalance: totalEndBalance,
         });
       }
     }
 
-    // Calculate weighted average APR
-    const weightedApr = multiLoanData.loans.reduce(
-      (sum, loan) => sum + (loan.apr * loan.principal), 0
-    ) / multiLoanData.totalPrincipal;
+    // Calculate weighted average APR (guard against zero principal)
+    const weightedApr = multiLoanData.totalPrincipal > 0
+      ? multiLoanData.loans.reduce(
+          (sum, loan) => sum + (loan.apr * loan.principal), 0
+        ) / multiLoanData.totalPrincipal
+      : 0;
 
     return {
       principal: multiLoanData.totalPrincipal,
@@ -148,11 +156,11 @@ function App() {
             </section>
 
             <section className="card chart-section">
-              <AmortizationChart data={loanData} />
+              <AmortizationChart data={loanData} multiLoanData={multiLoanData} viewMode={viewMode} onViewModeChange={setViewMode} />
             </section>
 
             <section className="card table-section">
-              <AmortizationTable data={loanData} />
+              <AmortizationTable data={loanData} multiLoanData={multiLoanData} viewMode={viewMode} onViewModeChange={setViewMode} />
             </section>
 
             {multiLoanData && multiLoanData.loans.length > 1 && (

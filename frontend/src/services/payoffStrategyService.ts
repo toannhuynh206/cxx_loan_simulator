@@ -286,11 +286,10 @@ export function simulateStrategy(
           totalInterestPaid: loanInterestPaid.get(loan.id) ?? 0,
           totalPaid: loanTotalPaid.get(loan.id) ?? 0
         });
-        // Freed minimum rolls into available extra for all future months
-        const minimum = loan.loanType === 'credit-card'
-          ? computeMinimumPayment(loan, 0)
-          : loan.minimumPayment;
-        freedMinPayments += minimum;
+        // Freed minimum rolls into available extra for all future months.
+        // Use the snapshot minimum — calling computeMinimumPayment with balance=0
+        // would return the $25 floor for credit cards, not the actual freed amount.
+        freedMinPayments += loan.minimumPayment;
       }
 
       monthEvent.loans.push({
