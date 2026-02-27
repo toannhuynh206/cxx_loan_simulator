@@ -206,15 +206,20 @@ export function simulateStrategy(
     if (strategy === 'standard') {
       // Pay minimum to each loan first, then split any extra evenly.
       // This guarantees no loan is underpaid regardless of portfolio composition.
+      let minimumOverflow = 0;
       activeLoans.forEach(loan => {
         const balance = activeLoanBalances.get(loan.id) ?? 0;
+        const interest = monthlyInterestForLoan(balance, loan.apr, loan.loanType);
+        const maxPayoff = balance + interest;
         const minimum = loan.loanType === 'credit-card'
           ? computeMinimumPayment(loan, balance)
           : loan.minimumPayment;
-        loanPayments.set(loan.id, minimum);
+        const cappedMinimum = Math.min(minimum, maxPayoff);
+        minimumOverflow += (minimum - cappedMinimum);
+        loanPayments.set(loan.id, cappedMinimum);
       });
 
-      let remainingExtra = totalExtra;
+      let remainingExtra = totalExtra + minimumOverflow;
       let adjustable = [...activeLoans];
       while (remainingExtra > 0.01 && adjustable.length > 0) {
         const extraPerLoan = remainingExtra / adjustable.length;
@@ -245,16 +250,22 @@ export function simulateStrategy(
     } else {
       // Avalanche or Snowball: minimums to all, extra to priority loan(s) in order.
       const priorityLoans = getLoanPriority(activeLoans, strategy, activeLoanBalances);
-      let remainingExtra = totalExtra;
+      let minimumOverflow = 0;
 
       // Step 1: assign minimums to all active loans
       activeLoans.forEach(loan => {
         const balance = activeLoanBalances.get(loan.id) ?? 0;
+        const interest = monthlyInterestForLoan(balance, loan.apr, loan.loanType);
+        const maxPayoff = balance + interest;
         const minimum = loan.loanType === 'credit-card'
           ? computeMinimumPayment(loan, balance)
           : loan.minimumPayment;
-        loanPayments.set(loan.id, minimum);
+        const cappedMinimum = Math.min(minimum, maxPayoff);
+        minimumOverflow += (minimum - cappedMinimum);
+        loanPayments.set(loan.id, cappedMinimum);
       });
+
+      let remainingExtra = totalExtra + minimumOverflow;
 
       // Step 2: apply remaining extra to priority loans in order
       for (const loan of priorityLoans) {

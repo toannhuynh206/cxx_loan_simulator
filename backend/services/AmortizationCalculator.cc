@@ -68,6 +68,20 @@ namespace loan {
 namespace {
 constexpr double kPaymentEpsilon = 0.01;
 
+bool isSupportedLoanType(const std::string& type) {
+    return type == "credit-card" ||
+           type == "personal-loan" ||
+           type == "auto-loan" ||
+           type == "mortgage" ||
+           type == "student-loan";
+}
+
+bool isSupportedCascadeStrategy(const std::string& strategy) {
+    return strategy == "avalanche" ||
+           strategy == "snowball" ||
+           strategy == "standard";
+}
+
 std::string formatDollars(double value) {
     std::ostringstream oss;
     oss << std::fixed << std::setprecision(2) << value;
@@ -125,10 +139,19 @@ bool AmortizationCalculator::validateInput(const LoanRequest& request, std::stri
 }
 
 double AmortizationCalculator::calculateAmortizationPayment(double principal, double rate, int months) const {
+    if (months <= 0) {
+        throw std::invalid_argument("Loan term must be at least 1 month");
+    }
     if (rate == 0) {
         return principal / months;
     }
-    return principal * (rate * std::pow(1 + rate, months)) / (std::pow(1 + rate, months) - 1);
+    double factor = std::pow(1 + rate, months);
+    double denominator = factor - 1.0;
+    // Guard against floating-point underflow on very small rates
+    if (denominator < 1e-12) {
+        return principal / months;
+    }
+    return principal * (rate * factor) / denominator;
 }
 
 // monthlyRate is pre-computed by the caller using the correct model for the loan type.
@@ -218,6 +241,22 @@ LoanResponse AmortizationCalculator::calculate(const LoanRequest& request) {
 // CREDIT CARD  —  APR / 365 × 30 (daily accrual model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCardEntry& entry) {
+    if (entry.balance <= 0) {
+        throw std::invalid_argument("Credit card balance must be greater than 0");
+    }
+    if (entry.apr < 0 || entry.apr > 100) {
+        throw std::invalid_argument("Credit card APR must be between 0 and 100");
+    }
+    if (entry.monthlyPayment < 0) {
+        throw std::invalid_argument("Credit card monthlyPayment cannot be negative");
+    }
+    if (entry.minimumPaymentPercent < 0 || entry.minimumPaymentPercent > 100) {
+        throw std::invalid_argument("Credit card minimumPaymentPercent must be between 0 and 100");
+    }
+    if (entry.minimumPaymentFloor < 0) {
+        throw std::invalid_argument("Credit card minimumPaymentFloor cannot be negative");
+    }
+
     LoanCalculationResult result;
     result.loanId = entry.id;
     result.loanName = entry.name;
@@ -260,6 +299,19 @@ LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCa
 // PERSONAL LOAN  —  APR / 12 (actuarial monthly model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const PersonalLoanEntry& entry) {
+    if (entry.balance <= 0) {
+        throw std::invalid_argument("Personal loan balance must be greater than 0");
+    }
+    if (entry.interestRate < 0 || entry.interestRate > 100) {
+        throw std::invalid_argument("Personal loan APR/interestRate must be between 0 and 100");
+    }
+    if (entry.termMonths <= 0) {
+        throw std::invalid_argument("Personal loan termMonths must be greater than 0");
+    }
+    if (entry.monthlyPayment < 0) {
+        throw std::invalid_argument("Personal loan monthlyPayment cannot be negative");
+    }
+
     LoanCalculationResult result;
     result.loanId = entry.id;
     result.loanName = entry.name;
@@ -458,6 +510,16 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 // STUDENT LOAN  —  APR / 12 (actuarial monthly model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const StudentLoanEntry& entry) {
+    if (entry.balance <= 0) {
+        throw std::invalid_argument("Student loan balance must be greater than 0");
+    }
+    if (entry.interestRate < 0 || entry.interestRate > 100) {
+        throw std::invalid_argument("Student loan APR/interestRate must be between 0 and 100");
+    }
+    if (entry.monthlyPayment < 0) {
+        throw std::invalid_argument("Student loan monthlyPayment cannot be negative");
+    }
+
     LoanCalculationResult result;
     result.loanId = entry.id;
     result.loanName = entry.name;
@@ -526,40 +588,7 @@ LoanCalculationResult AmortizationCalculator::calculateLoan(const LoanEntry& ent
         return calculateStudentLoan(StudentLoanEntry::fromJson(entry.rawJson));
     }
 
-    // Fallback: treat as installment loan (APR / 12)
-    LoanCalculationResult result;
-    result.loanId = entry.id;
-    result.loanName = entry.name;
-    result.loanType = entry.type;
-    result.principal = entry.balance;
-    result.interestRate = entry.interestRate;
-    result.monthlyPayment = entry.monthlyPayment;
-    result.totalInterest = 0.0;
-    result.totalPaid = 0.0;
-    result.totalPMI = 0.0;
-    result.totalEscrow = 0.0;
-    result.minimumPayment = 0.0;
-    result.vehicleValue = 0.0;
-    result.equityPercent = 0.0;
-
-    validatePaymentCoversFirstMonthInterest(
-        entry.balance,
-        installmentMonthlyRate(entry.interestRate),
-        entry.monthlyPayment,
-        "Loan"
-    );
-
-    buildSimpleSchedule(
-        entry.balance,
-        installmentMonthlyRate(entry.interestRate),
-        entry.monthlyPayment,
-        1200,
-        result.events,
-        result.totalInterest,
-        result.totalPaid,
-        result.totalMonths
-    );
-    return result;
+    throw std::invalid_argument("Unsupported loan type: " + entry.type);
 }
 
 // ============================================
@@ -596,9 +625,7 @@ double AmortizationCalculator::computeCascadeMinimum(
             int term = (plan == "extended") ? 300 : 120;
             minimum = calculateAmortizationPayment(entry.balance, rate, term);
         } else {
-            minimum = entry.monthlyPayment > 0
-                ? entry.monthlyPayment
-                : calculateAmortizationPayment(entry.balance, rate, 120);
+            throw std::invalid_argument("Unsupported loan type in cascade: " + type);
         }
     }
 
@@ -614,6 +641,9 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
     const double EPSILON  = 0.01;
 
     const int n = static_cast<int>(request.loans.size());
+    if (!isSupportedCascadeStrategy(request.strategy)) {
+        throw std::invalid_argument("Unsupported cascade strategy: " + request.strategy);
+    }
 
     // --- Per-loan working state ---
     struct LoanState {
@@ -629,15 +659,31 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
     std::vector<LoanState> states(n);
     for (int i = 0; i < n; ++i) {
         const LoanEntry& e = request.loans[i];
+        if (!isSupportedLoanType(e.type)) {
+            throw std::invalid_argument("Unsupported loan type in cascade: " + e.type);
+        }
+        if (e.balance <= 0) {
+            throw std::invalid_argument("Cascade loan balance must be greater than 0");
+        }
+        if (e.monthlyPayment < 0) {
+            throw std::invalid_argument("Cascade loan monthlyPayment cannot be negative");
+        }
+
         LoanState& s = states[i];
         s.balance = e.balance;
 
         // Credit card: APR lives in rawJson["apr"], NOT entry.interestRate
         if (e.type == "credit-card") {
             double apr = e.rawJson.get("apr", 0.0).asDouble();
+            if (apr < 0 || apr > 100) {
+                throw std::invalid_argument("Credit card APR in cascade must be between 0 and 100");
+            }
             s.monthlyRate = creditCardMonthlyRate(apr);
             s.effectiveAPR = apr;
         } else {
+            if (e.interestRate < 0 || e.interestRate > 100) {
+                throw std::invalid_argument("Loan APR/interestRate in cascade must be between 0 and 100");
+            }
             s.monthlyRate  = installmentMonthlyRate(e.interestRate);
             s.effectiveAPR = e.interestRate;
         }
@@ -651,7 +697,9 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
     {
         double firstMonthMin = 0.0;
         for (int i = 0; i < n; ++i) {
-            firstMonthMin += states[i].originalMinimum;
+            const double firstMonthInterest = request.loans[i].balance * states[i].monthlyRate;
+            const double firstMonthCap = request.loans[i].balance + firstMonthInterest;
+            firstMonthMin += std::min(states[i].originalMinimum, firstMonthCap);
         }
         if (request.totalBudget < firstMonthMin - EPSILON) {
             throw std::invalid_argument(
@@ -675,11 +723,17 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
         std::vector<double> minimums(n, 0.0);
         double totalMin = 0.0;
         for (int i : active) {
+            const double startBalance = states[i].balance;
+            const double interest = startBalance * states[i].monthlyRate;
+            const double maxPayoff = startBalance + interest;
+
+            double rawMinimum = 0.0;
             if (request.loans[i].type == "credit-card") {
-                minimums[i] = computeCascadeMinimum(request.loans[i], states[i].balance);
+                rawMinimum = computeCascadeMinimum(request.loans[i], startBalance);
             } else {
-                minimums[i] = states[i].originalMinimum;
+                rawMinimum = states[i].originalMinimum;
             }
+            minimums[i] = std::min(rawMinimum, maxPayoff);
             totalMin += minimums[i];
         }
 

@@ -5,6 +5,8 @@ services:
     build: ./backend
     ports:
       - "8080:8080"
+    environment:
+      - CORS_ORIGINS=https://loanscope.org,https://www.loanscope.org
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/health"]
       interval: 30s
