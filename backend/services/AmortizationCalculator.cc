@@ -2,6 +2,8 @@
 #include <cmath>
 #include <stdexcept>
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
 
 // ============================================================
 // CALCULATION ASSUMPTIONS
@@ -63,6 +65,35 @@
 
 namespace loan {
 
+namespace {
+constexpr double kPaymentEpsilon = 0.01;
+
+std::string formatDollars(double value) {
+    std::ostringstream oss;
+    oss << std::fixed << std::setprecision(2) << value;
+    return oss.str();
+}
+
+void validatePaymentCoversFirstMonthInterest(
+    double principal,
+    double monthlyRate,
+    double payment,
+    const std::string& loanLabel
+) {
+    if (principal <= 0 || payment <= 0) {
+        return;
+    }
+
+    const double firstMonthInterest = principal * monthlyRate;
+    if (payment <= firstMonthInterest + 1e-9) {
+        throw std::invalid_argument(
+            loanLabel + " monthly payment must exceed first-month interest ($" +
+            formatDollars(firstMonthInterest) + ")."
+        );
+    }
+}
+} // namespace
+
 bool AmortizationCalculator::validateInput(const LoanRequest& request, std::string& error) {
     if (request.principal <= 0) {
         error = "Principal must be positive";
@@ -85,7 +116,7 @@ bool AmortizationCalculator::validateInput(const LoanRequest& request, std::stri
     double firstMonthInterest = request.principal * installmentMonthlyRate(request.apr);
     if (request.monthlyPayment <= firstMonthInterest) {
         error = "Monthly payment must exceed monthly interest ($" +
-                std::to_string(std::round(firstMonthInterest * 100) / 100) +
+                formatDollars(firstMonthInterest) +
                 ") to pay off loan";
         return false;
     }
@@ -204,9 +235,12 @@ LoanCalculationResult AmortizationCalculator::calculateCreditCard(const CreditCa
     double rate = creditCardMonthlyRate(entry.apr);
 
     double minPaymentByPercent = entry.balance * (entry.minimumPaymentPercent / 100.0);
-    result.minimumPayment = std::max(minPaymentByPercent, entry.minimumPaymentFloor);
+    double policyMinimum = std::max(minPaymentByPercent, entry.minimumPaymentFloor);
+    double interestFloor = entry.balance * rate + kPaymentEpsilon;
+    result.minimumPayment = std::max(policyMinimum, interestFloor);
 
     double payment = entry.monthlyPayment > 0 ? entry.monthlyPayment : result.minimumPayment;
+    validatePaymentCoversFirstMonthInterest(entry.balance, rate, payment, "Credit card");
     result.monthlyPayment = payment;
 
     buildSimpleSchedule(
@@ -247,6 +281,7 @@ LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const Person
     if (payment <= 0 && entry.termMonths > 0) {
         payment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
     }
+    validatePaymentCoversFirstMonthInterest(entry.balance, rate, payment, "Personal loan");
     result.monthlyPayment = payment;
 
     buildSimpleSchedule(
@@ -337,6 +372,23 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
 // PITI: Principal, Interest, Taxes, Insurance with PMI tracking
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEntry& entry) {
+    if (entry.homePrice <= 0) {
+        throw std::invalid_argument("Mortgage homePrice must be greater than 0");
+    }
+    if (entry.balance <= 0) {
+        throw std::invalid_argument("Mortgage balance must be greater than 0");
+    }
+    if (entry.interestRate < 0 || entry.interestRate > 100) {
+        throw std::invalid_argument("Mortgage interestRate must be between 0 and 100");
+    }
+    if (entry.termYears <= 0) {
+        throw std::invalid_argument("Mortgage termYears must be greater than 0");
+    }
+    if (entry.downPayment < 0 || entry.propertyTaxAnnual < 0 ||
+        entry.homeInsuranceAnnual < 0 || entry.pmiRate < 0 || entry.hoaMonthly < 0) {
+        throw std::invalid_argument("Mortgage optional amounts cannot be negative");
+    }
+
     LoanCalculationResult result;
     result.loanId = entry.id;
     result.loanName = entry.name;
@@ -438,6 +490,7 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
     if (payment <= 0) {
         payment = calculateAmortizationPayment(entry.balance, rate, termMonths);
     }
+    validatePaymentCoversFirstMonthInterest(entry.balance, rate, payment, "Student loan");
     result.monthlyPayment = payment;
     result.minimumPayment = payment;
 
@@ -489,6 +542,13 @@ LoanCalculationResult AmortizationCalculator::calculateLoan(const LoanEntry& ent
     result.vehicleValue = 0.0;
     result.equityPercent = 0.0;
 
+    validatePaymentCoversFirstMonthInterest(
+        entry.balance,
+        installmentMonthlyRate(entry.interestRate),
+        entry.monthlyPayment,
+        "Loan"
+    );
+
     buildSimpleSchedule(
         entry.balance,
         installmentMonthlyRate(entry.interestRate),
@@ -509,37 +569,40 @@ double AmortizationCalculator::computeCascadeMinimum(
     const LoanEntry& entry, double currentBalance) const
 {
     const std::string& type = entry.type;
+    double minimum = 0.0;
+    double interestFloor = 0.0;
 
     if (type == "credit-card") {
-        double pct   = entry.rawJson.get("minimumPaymentPercent", 2.0).asDouble() / 100.0;
+        double apr = entry.rawJson.get("apr", 0.0).asDouble();
+        double pct = entry.rawJson.get("minimumPaymentPercent", 2.0).asDouble() / 100.0;
         double floor = entry.rawJson.get("minimumPaymentFloor", 25.0).asDouble();
-        return std::max(currentBalance * pct, floor);
+        minimum = std::max(currentBalance * pct, floor);
+        interestFloor = currentBalance * creditCardMonthlyRate(apr);
+    } else {
+        const double rate = installmentMonthlyRate(entry.interestRate);
+        interestFloor = currentBalance * rate;
+
+        if (type == "personal-loan") {
+            int term = entry.rawJson.get("termMonths", 36).asInt();
+            minimum = calculateAmortizationPayment(entry.balance, rate, term);
+        } else if (type == "auto-loan") {
+            int term = entry.rawJson.get("termMonths", 60).asInt();
+            minimum = calculateAmortizationPayment(entry.balance, rate, term);
+        } else if (type == "mortgage") {
+            int term = entry.rawJson.get("termYears", 30).asInt() * 12;
+            minimum = calculateAmortizationPayment(entry.balance, rate, term);
+        } else if (type == "student-loan") {
+            std::string plan = entry.rawJson.get("repaymentPlan", "standard").asString();
+            int term = (plan == "extended") ? 300 : 120;
+            minimum = calculateAmortizationPayment(entry.balance, rate, term);
+        } else {
+            minimum = entry.monthlyPayment > 0
+                ? entry.monthlyPayment
+                : calculateAmortizationPayment(entry.balance, rate, 120);
+        }
     }
 
-    // Installment loans: fixed amortization payment on original balance
-    double rate = installmentMonthlyRate(entry.interestRate);
-
-    if (type == "personal-loan") {
-        int term = entry.rawJson.get("termMonths", 36).asInt();
-        return calculateAmortizationPayment(entry.balance, rate, term);
-    }
-    if (type == "auto-loan") {
-        int term = entry.rawJson.get("termMonths", 60).asInt();
-        return calculateAmortizationPayment(entry.balance, rate, term);
-    }
-    if (type == "mortgage") {
-        int term = entry.rawJson.get("termYears", 30).asInt() * 12;
-        return calculateAmortizationPayment(entry.balance, rate, term);
-    }
-    if (type == "student-loan") {
-        std::string plan = entry.rawJson.get("repaymentPlan", "standard").asString();
-        int term = (plan == "extended") ? 300 : 120;
-        return calculateAmortizationPayment(entry.balance, rate, term);
-    }
-
-    // Fallback: use whatever payment was provided
-    return entry.monthlyPayment > 0 ? entry.monthlyPayment
-                                    : calculateAmortizationPayment(entry.balance, rate, 120);
+    return std::max(minimum, interestFloor + kPaymentEpsilon);
 }
 
 // ============================================
@@ -644,8 +707,38 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
         for (int i : active) allocs[i] = minimums[i];
 
         if (request.strategy == "standard") {
-            double extraPerLoan = active.size() > 0 ? extra / static_cast<double>(active.size()) : 0.0;
-            for (int i : active) allocs[i] += extraPerLoan;
+            double remaining = extra;
+            std::vector<int> adjustable = active;
+
+            while (remaining > EPSILON && !adjustable.empty()) {
+                const double extraPerLoan = remaining / static_cast<double>(adjustable.size());
+                double distributed = 0.0;
+                std::vector<int> nextAdjustable;
+
+                for (int i : adjustable) {
+                    const double interest = states[i].balance * states[i].monthlyRate;
+                    const double maxPayoff = states[i].balance + interest;
+                    const double maxExtra = maxPayoff - allocs[i];
+                    if (maxExtra <= EPSILON) {
+                        continue;
+                    }
+
+                    const double toApply = std::min(extraPerLoan, maxExtra);
+                    allocs[i] += toApply;
+                    distributed += toApply;
+
+                    if (maxExtra - toApply > EPSILON) {
+                        nextAdjustable.push_back(i);
+                    }
+                }
+
+                if (distributed <= EPSILON) {
+                    break;
+                }
+
+                remaining -= distributed;
+                adjustable = std::move(nextAdjustable);
+            }
         } else {
             double remaining = extra;
             for (int i : priority) {

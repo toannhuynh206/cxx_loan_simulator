@@ -28,7 +28,7 @@
 //
 // ============================================================
 
-import { MonthlyEvent, LoanType } from '../types/loan';
+import { MonthlyEvent } from '../types/loan';
 
 const DAYS_IN_YEAR = 365;
 const DEFAULT_DAYS_IN_CYCLE = 30;

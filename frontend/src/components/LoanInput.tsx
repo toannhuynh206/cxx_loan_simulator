@@ -11,7 +11,7 @@ import {
   StudentLoanEntry,
 } from '../types/loan';
 import { PayoffStrategyType } from '../types/payoffStrategy';
-import { paymentForTerm } from '../utils/amortization';
+import { monthlyInterestForLoan, paymentForTerm } from '../utils/amortization';
 import { InfoTooltip, FIELD_DEFINITIONS } from './InfoTooltip';
 
 type StudentLoanMode = 'auto' | 'specify';
@@ -218,7 +218,9 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     switch (loan.type) {
       case 'credit-card': {
         const cc = loan as CreditCardEntry;
-        return Math.max(loan.balance * (cc.minimumPaymentPercent / 100), cc.minimumPaymentFloor);
+        const policyMinimum = Math.max(loan.balance * (cc.minimumPaymentPercent / 100), cc.minimumPaymentFloor);
+        const interestFloor = monthlyInterestForLoan(loan.balance, cc.apr, loan.type) + 0.01;
+        return Math.max(policyMinimum, interestFloor);
       }
       case 'personal-loan':
         return paymentForTerm(loan.balance, loan.interestRate, (loan as PersonalLoanEntry).termMonths || 60, 'personal-loan');
@@ -274,11 +276,29 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       }
       // Step 2: distribute remaining extra evenly
       if (remainingBudget > 0 && active.length > 0) {
-        const extraPerLoan = remainingBudget / active.length;
-        for (const loan of active) {
-          const current = allocatedPayments.get(loan.id) ?? 0;
-          const extra = Math.min(extraPerLoan, Math.max(0, maxPayoff(loan) - current));
-          allocatedPayments.set(loan.id, current + extra);
+        let adjustable = [...active];
+        while (remainingBudget > 0.01 && adjustable.length > 0) {
+          const extraPerLoan = remainingBudget / adjustable.length;
+          let distributed = 0;
+          const nextAdjustable: typeof adjustable = [];
+
+          for (const loan of adjustable) {
+            const current = allocatedPayments.get(loan.id) ?? 0;
+            const maxExtra = Math.max(0, maxPayoff(loan) - current);
+            if (maxExtra <= 0.01) continue;
+
+            const extra = Math.min(extraPerLoan, maxExtra);
+            allocatedPayments.set(loan.id, current + extra);
+            distributed += extra;
+
+            if (maxExtra - extra > 0.01) {
+              nextAdjustable.push(loan);
+            }
+          }
+
+          if (distributed <= 0.01) break;
+          remainingBudget -= distributed;
+          adjustable = nextAdjustable;
         }
       }
     } else {
@@ -924,10 +944,6 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       </>
     );
   };
-
-  // getRecommendedMinimum kept as a thin wrapper for backward compat within this file
-  const getRecommendedMinimum = (balance: number, interestRate: number): number =>
-    paymentForTerm(balance, interestRate, 120);
 
   const renderStudentLoanFields = (loan: StudentLoanEntry) => {
     return (

@@ -1,175 +1,228 @@
-# Loan Amortization Graph Simulator
+# LoanScope
 
-A full-stack application that calculates and visualizes loan payoff schedules with a sawtooth pattern showing interest accrual (balance up) and payments (balance down).
+**Visualize your loans. Strategize your path to financial freedom.**
+
+LoanScope is a full-stack loan simulation tool that models amortization schedules across multiple loan types simultaneously. It uses a C++ calculation engine for mathematically accurate interest modeling and provides an interactive React frontend for exploring payoff strategies, viewing per-loan breakdowns, and comparing debt elimination approaches.
+
+---
+
+## Features
+
+- **Multi-loan simulation** — Add any mix of student loans, credit cards, personal loans, auto loans, and mortgages and calculate them together
+- **Cascade payoff engine** — Commit to a total monthly budget; when a loan pays off, its freed payment automatically rolls to the remaining loans
+- **Payoff strategy comparison** — Side-by-side comparison of Avalanche (highest APR first), Snowball (lowest balance first), and minimum-only baseline with interest and time saved metrics
+- **Per-loan chart & table** — Toggle between a combined overview and per-loan views; the chart and table stay in sync with a single toggle
+- **Accurate interest models** — Credit cards use daily accrual (APR/365 × 30 days); installment loans use the actuarial monthly model (APR/12) per Regulation Z/TILA
+- **Mortgage PITI** — Full principal, interest, taxes, insurance, PMI, and HOA breakdown with PMI auto-removal at 80% LTV
+- **Amortization milestones** — 25%, 50%, 75% payoff markers highlighted on both chart and table
+- **Zoom slider** — Single range slider controls the chart time window; pan arrows scroll when zoomed in
+- **Dark / light theme**
+
+---
 
 ## Tech Stack
 
-- **Backend**: C++17 with [Drogon](https://github.com/drogonframework/drogon) HTTP framework
-- **Frontend**: React + TypeScript + [Recharts](https://recharts.org/)
-- **Infrastructure**: Docker Compose (dev) / AWS ECS Fargate (prod)
+### Backend
+| Technology | Role |
+|---|---|
+| **C++17** | Core calculation engine |
+| **Drogon** | Async HTTP framework, route handling |
+| **JsonCpp** | JSON serialization / deserialization |
+| **CMake** | Build system |
 
-## Quick Start
+### Frontend
+| Technology | Role |
+|---|---|
+| **React 18** | UI framework |
+| **TypeScript** | Type safety across all components and services |
+| **Vite** | Dev server (HMR) + production bundler |
+| **Recharts** | Amortization and strategy charts |
+| **Axios** | HTTP client |
+
+### Infrastructure
+| Technology | Role |
+|---|---|
+| **Docker** | Containerization (backend + frontend) |
+| **Docker Compose** | Multi-service orchestration |
+| **Nginx** | Static file serving + API reverse proxy (production) |
+
+---
+
+## Architecture
+
+```
+Browser
+  │
+  ├─ Production
+  │    └─ Nginx (:80) ──┬── serves built React SPA
+  │                     └── /api/* → C++ backend (:8080)
+  │
+  └─ Development
+       ├─ Vite dev server (:5173)   ← HMR, instant TS/TSX/CSS reload
+       └─ C++ backend (:8080)
+```
+
+The C++ backend handles all amortization math. The frontend strategy service (`payoffStrategyService.ts`) runs a separate month-by-month simulation for the interactive "what-if extra payment" sliders in the Debt Payoff Strategy panel — keeping comparisons responsive without additional backend round trips.
+
+---
+
+## Loan Types
+
+### Credit Card
+- Interest model: **daily accrual** — `APR / 365 × 30 days`
+- Minimum payment recalculates each month on current balance: `max(balance × minPercent, minFloor)`
+- Configurable credit limit, minimum payment percent, and floor
+
+### Personal Loan
+- Interest model: **actuarial monthly** — `APR / 12`
+- Fixed amortization payment over a defined term
+- Optional origination fee
+
+### Auto Loan
+- Interest model: **actuarial monthly** — `APR / 12`
+- Supports vehicle price, down payment, trade-in value, and trade-in payoff
+- Tracks vehicle depreciation alongside loan balance
+
+### Mortgage
+- Interest model: **actuarial monthly** — `APR / 12`
+- Full PITI: principal + interest + property tax + homeowners insurance + PMI + HOA
+- PMI automatically drops when loan-to-value reaches 80%
+- Supports 15, 20, and 30-year fixed terms
+
+### Student Loan
+- Interest model: **actuarial monthly** — `APR / 12`
+- Repayment plans: **Standard** (10 years / 120 months), **Extended** (25 years / 300 months), **Graduated** (10 years with step-up payments)
+
+---
+
+## API Endpoints
+
+All endpoints are served from the C++ backend.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/v1/health` | Health check |
+| `POST` | `/api/v1/loan/calculate` | Single-loan amortization schedule |
+| `POST` | `/api/v1/loan/calculate-multiple` | Independent schedules for multiple loans |
+| `POST` | `/api/v1/loan/calculate-cascade` | Cascade payoff — fixed budget redistributed by strategy each month |
+
+### Cascade Request Example
+```json
+{
+  "loans": [
+    { "type": "student-loan", "balance": 25000, "interestRate": 6.5, ... },
+    { "type": "credit-card",  "balance": 4000,  "apr": 24.99, ... }
+  ],
+  "totalBudget": 800,
+  "strategy": "avalanche"
+}
+```
+Strategies: `"avalanche"` · `"snowball"` · `"standard"`
+
+---
+
+## Running Locally
 
 ### Prerequisites
+- Docker and Docker Compose
 
-- Docker and Docker Compose installed
-- (Optional) AWS CLI configured for deployment
-
-### Run Locally
-
+### Development (hot reload)
 ```bash
-# Build and start all services
+docker-compose -f docker-compose.dev.yml up --build
+```
+- Frontend: `http://localhost:5173` (Vite HMR — TypeScript/CSS changes reload instantly, no rebuild needed)
+- Backend API: `http://localhost:8080`
+
+> After any C++ file change, stop and re-run with `--build` to recompile the backend.
+
+### Production
+```bash
 docker-compose up --build
-
-# Open in browser
-open http://localhost
 ```
+- App: `http://localhost:80`
+- Backend API: `http://localhost:8080`
 
-The backend API runs on port 8080, frontend on port 80.
-
-### Test the API
-
-```bash
-curl -X POST http://localhost:8080/api/v1/loan/calculate \
-  -H "Content-Type: application/json" \
-  -d '{"principal":10000,"apr":18.99,"monthlyPayment":250}'
-```
+---
 
 ## Project Structure
 
 ```
 loan_simulation/
-├── docker-compose.yml           # Local development orchestration
 ├── backend/
-│   ├── Dockerfile               # Multi-stage C++ build
-│   ├── CMakeLists.txt           # CMake build config
-│   ├── config.json              # Drogon server config
-│   ├── main.cc                  # Entry point + CORS
+│   ├── Dockerfile                         # Multi-stage C++ build
+│   ├── CMakeLists.txt                     # CMake build config (C++17)
+│   ├── config.json                        # Drogon server config
+│   ├── main.cc                            # Entry point + CORS setup
 │   ├── controllers/
-│   │   └── LoanController.cc    # REST API endpoint
+│   │   ├── LoanController.h               # Route declarations
+│   │   └── LoanController.cc              # HTTP request handlers
 │   ├── services/
-│   │   └── AmortizationCalculator.cc  # Core calculation
+│   │   ├── AmortizationCalculator.h       # Calculator interface + rate models
+│   │   └── AmortizationCalculator.cc      # Core amortization engine + cascade logic
 │   └── models/
-│       └── LoanModels.h         # Data structures
+│       └── LoanModels.h                   # Request/response structs (all loan types)
+│
 ├── frontend/
-│   ├── Dockerfile               # Node build + Nginx
-│   ├── nginx.conf               # Production config
+│   ├── Dockerfile                         # Node build stage + Nginx serving
+│   ├── Dockerfile.dev                     # Vite dev server
+│   ├── nginx.conf                         # Production Nginx config
 │   └── src/
-│       ├── App.tsx
-│       └── components/
-│           ├── LoanForm.tsx
-│           ├── AmortizationChart.tsx
-│           └── ResultsSummary.tsx
+│       ├── App.tsx                        # Root — shared state, routing to endpoints
+│       ├── components/
+│       │   ├── LoanInput.tsx              # Loan entry forms + budget/strategy UI
+│       │   ├── LoanForm.tsx               # Per-loan type form fields
+│       │   ├── AmortizationChart.tsx      # Balance-over-time chart (combined + per-loan)
+│       │   ├── AmortizationTable.tsx      # Paginated schedule table (combined + per-loan tabs)
+│       │   ├── DebtPayoffStrategy.tsx     # Strategy comparison panel
+│       │   ├── StrategyBalanceChart.tsx   # Balance chart per strategy
+│       │   ├── StrategyComparisonTable.tsx
+│       │   ├── PaymentBreakdownChart.tsx  # Principal vs interest breakdown
+│       │   ├── ResultsSummary.tsx         # Top-line stats (total interest, months, etc.)
+│       │   └── ThemeToggle.tsx
+│       ├── services/
+│       │   ├── loanApi.ts                 # Axios calls to all backend endpoints
+│       │   └── payoffStrategyService.ts   # Frontend cascade sim for what-if analysis
+│       ├── types/
+│       │   ├── loan.ts                    # All loan entry + API response types
+│       │   └── payoffStrategy.ts          # Strategy simulation types
+│       └── utils/
+│           └── amortization.ts            # Shared math: rate models, payment formula
+│
+├── docker-compose.yml                     # Production compose
+├── docker-compose.dev.yml                 # Development compose (Vite HMR)
 └── aws/
-    ├── task-definition.json     # ECS task definition
-    └── deploy.sh                # Deployment script
+    ├── task-definition.json               # ECS Fargate task definition
+    └── deploy.sh                          # AWS deployment script
 ```
 
-## API Reference
+---
 
-### POST /api/v1/loan/calculate
+## Payoff Strategies
 
-Calculate loan amortization schedule.
+The **Debt Payoff Strategy** section compares three approaches given a fixed extra monthly payment on top of all minimums:
 
-**Request Body:**
-```json
-{
-  "principal": 10000,
-  "apr": 18.99,
-  "monthlyPayment": 250
-}
-```
+| Strategy | Priority Rule | Best For |
+|---|---|---|
+| **Avalanche** | Highest APR loan first | Minimizing total interest paid |
+| **Snowball** | Lowest balance loan first | Fastest psychological wins, motivation |
+| **Minimum Only** | No priority — baseline | Comparison reference |
 
-**Response:**
-```json
-{
-  "principal": 10000,
-  "apr": 18.99,
-  "monthlyPayment": 250,
-  "events": [
-    {
-      "month": 1,
-      "startBalance": 10000.00,
-      "interest": 158.25,
-      "payment": 250.00,
-      "endBalance": 9908.25
-    }
-  ],
-  "totalMonths": 56,
-  "totalInterest": 3842.17
-}
-```
+When a loan is fully paid off, its minimum payment is freed and added to the extra available for all subsequent months — compounding the acceleration over time.
 
-### GET /api/v1/health
+---
 
-Health check endpoint.
+## Interest Rate Accuracy
 
-**Response:**
-```json
-{
-  "status": "healthy",
-  "service": "loan-amortization-api"
-}
-```
+Two rate models are enforced throughout both the C++ backend and TypeScript frontend utilities to match how lenders legally compute interest:
 
-## Features
+| Loan Type | Model | Formula | Regulation |
+|---|---|---|---|
+| Credit card | Daily accrual | `APR / 365 × 30` | Truth in Lending Act |
+| Personal, auto, mortgage, student | Actuarial monthly | `APR / 12` | Reg Z / TILA |
 
-- **Sawtooth Visualization**: Red lines show interest (balance up), green lines show payments (balance down)
-- **Input Validation**: Ensures payment exceeds monthly interest
-- **Responsive Design**: Works on desktop and mobile
-- **Dark/Light Mode**: Follows system preference
+This distinction matters: at 20% APR, the credit card daily model yields ~1.644% per month vs. 1.667% with APR/12 — a difference that compounds significantly over years of revolving debt.
 
-## AWS Deployment
-
-1. Update `aws/deploy.sh` with your AWS account details:
-   ```bash
-   AWS_ACCOUNT_ID="your-account-id"
-   AWS_REGION="us-east-1"
-   ```
-
-2. Run the deployment script:
-   ```bash
-   chmod +x aws/deploy.sh
-   ./aws/deploy.sh
-   ```
-
-3. For the first deployment, create the ECS service manually with your VPC configuration.
-
-## Development
-
-### Backend Development
-
-The backend is built inside Docker, but you can develop locally if you have Drogon installed:
-
-```bash
-cd backend
-mkdir build && cd build
-cmake ..
-make
-./loan_amortization_api
-```
-
-### Frontend Development
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-The Vite dev server proxies `/api` requests to `localhost:8080`.
-
-## Algorithm
-
-The amortization calculation works as follows:
-
-```
-for each month until balance <= 0:
-    1. Calculate interest: balance * (APR / 100 / 12)
-    2. Add interest to balance (balance goes UP)
-    3. Subtract payment from balance (balance goes DOWN)
-    4. Record the event
-```
+---
 
 ## License
 

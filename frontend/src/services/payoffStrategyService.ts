@@ -51,14 +51,21 @@ import { monthlyInterestForLoan, paymentForTerm } from '../utils/amortization';
  * minimum recalculates on the current balance each month.
  */
 function computeMinimumPayment(
-  loan: { loanType: string; principal: number; apr: number; totalMonths: number; minimumPayment: number; monthlyPayment: number },
+  loan: {
+    loanType: string;
+    apr: number;
+    minimumPayment: number;
+    principal?: number;
+    totalMonths?: number;
+    monthlyPayment?: number;
+  },
   currentBalance?: number
 ): number {
   if (loan.loanType === 'mortgage') {
     // Mortgages: backend sets minimumPayment=0 and monthlyPayment=PITI.
     // We only want P&I — escrow and PMI go to third parties, not the loan.
-    const term = loan.totalMonths > 0 ? loan.totalMonths : 360;
-    return paymentForTerm(loan.principal, loan.apr, term, 'mortgage');
+    const term = (loan.totalMonths ?? 0) > 0 ? loan.totalMonths! : 360;
+    return paymentForTerm(loan.principal ?? 0, loan.apr, term, 'mortgage');
   }
 
   if (loan.loanType === 'credit-card' && currentBalance !== undefined) {
@@ -67,11 +74,12 @@ function computeMinimumPayment(
     const MIN_PERCENT = 0.02;
     const MIN_FLOOR = 25;
     const percentBased = currentBalance * MIN_PERCENT;
-    return Math.max(percentBased, MIN_FLOOR);
+    const interestFloor = monthlyInterestForLoan(currentBalance, loan.apr, 'credit-card') + 0.01;
+    return Math.max(percentBased, MIN_FLOOR, interestFloor);
   }
 
   // All other installment loans: use backend-provided payment as the minimum floor.
-  return loan.minimumPayment || loan.monthlyPayment;
+  return loan.minimumPayment || loan.monthlyPayment || 0;
 }
 
 /**
@@ -198,18 +206,41 @@ export function simulateStrategy(
     if (strategy === 'standard') {
       // Pay minimum to each loan first, then split any extra evenly.
       // This guarantees no loan is underpaid regardless of portfolio composition.
-      const extraPerLoan = activeLoans.length > 0 ? totalExtra / activeLoans.length : 0;
-
       activeLoans.forEach(loan => {
         const balance = activeLoanBalances.get(loan.id) ?? 0;
-        const interest = monthlyInterestForLoan(balance, loan.apr, loan.loanType);
-        // Recalculate credit card minimum on current balance
         const minimum = loan.loanType === 'credit-card'
           ? computeMinimumPayment(loan, balance)
           : loan.minimumPayment;
-        // Cap at full payoff amount to avoid overpaying
-        loanPayments.set(loan.id, Math.min(minimum + extraPerLoan, balance + interest));
+        loanPayments.set(loan.id, minimum);
       });
+
+      let remainingExtra = totalExtra;
+      let adjustable = [...activeLoans];
+      while (remainingExtra > 0.01 && adjustable.length > 0) {
+        const extraPerLoan = remainingExtra / adjustable.length;
+        let distributed = 0;
+        const nextAdjustable: LoanSnapshot[] = [];
+
+        for (const loan of adjustable) {
+          const balance = activeLoanBalances.get(loan.id) ?? 0;
+          const interest = monthlyInterestForLoan(balance, loan.apr, loan.loanType);
+          const currentPayment = loanPayments.get(loan.id) ?? 0;
+          const maxExtra = Math.max(0, (balance + interest) - currentPayment);
+          if (maxExtra <= 0.01) continue;
+
+          const extraToApply = Math.min(extraPerLoan, maxExtra);
+          loanPayments.set(loan.id, currentPayment + extraToApply);
+          distributed += extraToApply;
+
+          if (maxExtra - extraToApply > 0.01) {
+            nextAdjustable.push(loan);
+          }
+        }
+
+        if (distributed <= 0.01) break;
+        remainingExtra -= distributed;
+        adjustable = nextAdjustable;
+      }
 
     } else {
       // Avalanche or Snowball: minimums to all, extra to priority loan(s) in order.
