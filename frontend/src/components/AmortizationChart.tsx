@@ -543,24 +543,6 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
                   connectNulls
                 />
               ))}
-              {/* Payoff markers — vertical lines where each loan hits $0 */}
-              {multiLoanData?.loans.map((loan, i) => (
-                <ReferenceLine
-                  key={`payoff-${loan.loanId}`}
-                  x={loan.totalMonths}
-                  stroke={LOAN_COLORS[i % LOAN_COLORS.length]}
-                  strokeWidth={1}
-                  strokeDasharray="4 4"
-                  opacity={0.6}
-                  label={{
-                    value: loan.loanName.length > 8 ? loan.loanName.slice(0, 8) + '…' : loan.loanName,
-                    position: 'top',
-                    fill: LOAN_COLORS[i % LOAN_COLORS.length],
-                    fontSize: 11,
-                    fontWeight: 600,
-                  }}
-                />
-              ))}
             </ComposedChart>
           )}
 

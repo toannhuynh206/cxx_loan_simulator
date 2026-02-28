@@ -701,7 +701,7 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
             const double firstMonthCap = request.loans[i].balance + firstMonthInterest;
             firstMonthMin += std::min(states[i].originalMinimum, firstMonthCap);
         }
-        if (request.totalBudget < firstMonthMin - EPSILON) {
+        if (request.totalBudget < firstMonthMin - 0.50) {
             throw std::invalid_argument(
                 "totalBudget (" + std::to_string(static_cast<int>(request.totalBudget)) +
                 ") is less than the sum of all loan minimums (" +

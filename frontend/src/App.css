@@ -5620,3 +5620,190 @@ button:focus-visible {
     gap: var(--space-1);
   }
 }
+
+/* ============================================
+   PAYMENT SCENARIOS
+   ============================================ */
+
+.payment-scenarios {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.scenarios-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.scenarios-header h3 {
+  margin: 0;
+}
+
+.scenarios-subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+  margin: 0;
+}
+
+.scenarios-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.scenario-table-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.scenario-navigable {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.scenario-navigable .scenario-table {
+  flex: 1;
+  min-width: 0;
+}
+
+.scenario-nav-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex-shrink: 0;
+}
+
+.scenario-nav-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  padding: 0;
+  line-height: 1;
+}
+
+.scenario-nav-btn:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: #fff;
+  border-color: var(--color-accent);
+}
+
+.scenario-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.scenario-table-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.scenario-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.scenario-table thead tr {
+  border-bottom: 2px solid var(--color-border);
+}
+
+.scenario-table th {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.scenario-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-primary);
+}
+
+.scenario-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.scenario-table tbody tr:hover td {
+  background: var(--color-bg-secondary);
+}
+
+.scenario-row-highlight td {
+  background: var(--color-accent-subtle) !important;
+}
+
+.scenario-payment {
+  font-weight: 600;
+  font-family: var(--font-display);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.scenario-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  background: var(--color-accent);
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 99px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.scenario-interest {
+  color: var(--color-error);
+  font-weight: 500;
+}
+
+.scenario-goal {
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.scenario-mo {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+  font-weight: 400;
+  margin-left: 1px;
+}
+
+.scenarios-note {
+  font-size: 0.8rem;
+  color: var(--color-text-tertiary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+@media (max-width: 700px) {
+  .scenarios-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scenarios-header {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+}

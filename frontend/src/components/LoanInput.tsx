@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   LoanType,
   LoanEntry,
@@ -22,6 +22,24 @@ interface LoanInputProps {
 }
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
+
+const STORAGE_KEY = 'loanscope_form';
+
+const loadSavedForm = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+};
+
+const EMPTY_LOANS: AllLoans = {
+  'credit-card': [],
+  'personal-loan': [],
+  'auto-loan': [],
+  'mortgage': [],
+  'student-loan': [],
+};
 
 // Sample data for each loan type - realistic scenarios
 const SAMPLE_DATA = {
@@ -105,21 +123,22 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
 };
 
 export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) => {
-  const [activeTab, setActiveTab] = useState<LoanType>('student-loan');
-  const [loans, setLoans] = useState<AllLoans>({
-    'credit-card': [],
-    'personal-loan': [],
-    'auto-loan': [],
-    'mortgage': [],
-    'student-loan': [],
-  });
+  const [activeTab, setActiveTab] = useState<LoanType>(() => loadSavedForm()?.activeTab ?? 'student-loan');
+  const [loans, setLoans] = useState<AllLoans>(() => loadSavedForm()?.loans ?? EMPTY_LOANS);
 
   // Generic allocation state — applies to whichever loan type is active
-  const [allocationMode, setAllocationMode] = useState<StudentLoanMode>('auto');
-  const [allocationBudget, setAllocationBudget] = useState<number>(0);
-  const [allocationStrategy, setAllocationStrategy] = useState<PayoffStrategyType>('avalanche');
-  const [showAllocation, setShowAllocation] = useState<boolean>(false);
+  const [allocationMode, setAllocationMode] = useState<StudentLoanMode>(() => loadSavedForm()?.allocationMode ?? 'auto');
+  const [allocationBudget, setAllocationBudget] = useState<number>(() => loadSavedForm()?.allocationBudget ?? 0);
+  const [allocationStrategy, setAllocationStrategy] = useState<PayoffStrategyType>(() => loadSavedForm()?.allocationStrategy ?? 'avalanche');
+  const [showAllocation, setShowAllocation] = useState<boolean>(() => loadSavedForm()?.showAllocation ?? false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Persist form state to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      activeTab, loans, allocationMode, allocationBudget, allocationStrategy, showAllocation,
+    }));
+  }, [activeTab, loans, allocationMode, allocationBudget, allocationStrategy, showAllocation]);
 
   // Inline editing state for loan names
   const [editingLoanId, setEditingLoanId] = useState<string | null>(null);
@@ -168,7 +187,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         return sum + paymentForTerm(loan.balance, loan.interestRate, 120);
       }, 0);
 
-      setAllocationBudget(Math.round(totalMin));
+      setAllocationBudget(Math.ceil(totalMin));
       setShowAllocation(false);
     }
   };

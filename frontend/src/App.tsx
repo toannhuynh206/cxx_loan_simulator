@@ -6,6 +6,7 @@ import { PaymentBreakdownChart } from './components/PaymentBreakdownChart';
 import { AmortizationTable } from './components/AmortizationTable';
 import { ThemeToggle } from './components/ThemeToggle';
 import { DebtPayoffStrategy } from './components/DebtPayoffStrategy';
+import { PaymentScenarios } from './components/PaymentScenarios';
 import { calculateMultipleLoans, calculateCascade } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
 import { PayoffStrategyType } from './types/payoffStrategy';
@@ -21,6 +22,7 @@ function App() {
 
   // Reset all state to initial values
   const handleReset = () => {
+    localStorage.removeItem('loanscope_form');
     setMultiLoanData(null);
     setError(null);
     setViewMode('per-loan');
@@ -161,6 +163,10 @@ function App() {
 
             <section className="card table-section">
               <AmortizationTable data={loanData} multiLoanData={multiLoanData} viewMode={viewMode} onViewModeChange={setViewMode} />
+            </section>
+
+            <section className="card scenarios-section">
+              <PaymentScenarios multiLoanData={multiLoanData!} />
             </section>
 
             {multiLoanData && multiLoanData.loans.length > 1 && (
