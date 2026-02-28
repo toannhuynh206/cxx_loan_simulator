@@ -4,12 +4,14 @@ interface ExtraPaymentInputProps {
   value: number;
   onChange: (value: number) => void;
   maxSuggested?: number;
+  baseBudget?: number;
 }
 
 export const ExtraPaymentInput: React.FC<ExtraPaymentInputProps> = ({
   value,
   onChange,
-  maxSuggested = 1000
+  maxSuggested = 1000,
+  baseBudget,
 }) => {
   const quickAmounts = Array.from(new Set([50, 100, 200, 500, Math.max(0, Math.round(maxSuggested))]))
     .filter((amount) => amount > 0)
@@ -24,7 +26,9 @@ export const ExtraPaymentInput: React.FC<ExtraPaymentInputProps> = ({
     <div className="extra-payment-input">
       <div className="extra-payment-header">
         <label htmlFor="extra-payment">Extra Monthly Payment</label>
-        <span className="extra-payment-hint">Amount above minimum payments</span>
+        <span className="extra-payment-hint">
+          {baseBudget ? `Extra above your $${baseBudget.toLocaleString()}/mo budget` : 'Amount above minimum payments'}
+        </span>
       </div>
 
       <div className="extra-payment-control">
@@ -57,7 +61,10 @@ export const ExtraPaymentInput: React.FC<ExtraPaymentInputProps> = ({
 
       {value > 0 && (
         <div className="extra-payment-summary">
-          You're adding <strong>${value.toLocaleString()}/month</strong> to accelerate debt payoff
+          {baseBudget
+            ? <>Total: <strong>${(baseBudget + value).toLocaleString()}/mo</strong> (+${value.toLocaleString()} above your budget)</>
+            : <>You're adding <strong>${value.toLocaleString()}/month</strong> to accelerate debt payoff</>
+          }
         </div>
       )}
     </div>

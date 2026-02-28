@@ -367,9 +367,12 @@ export function simulateStrategy(
 }
 
 /**
- * Compare all three strategies against a minimum-only baseline.
- * "Interest saved" = how much less you pay vs. making only minimum payments.
- * "Months saved"   = how many months sooner you're debt-free.
+ * Compare all three strategies against the user's configured budget as the baseline.
+ *
+ * extraPayment = additional amount ABOVE the configured monthly budget.
+ *
+ * "Interest saved" and "months saved" are vs. paying exactly the configured
+ * budget with avalanche ordering (the default behaviour without any extra).
  */
 export function compareStrategies(
   loanData: CombinedLoanResult,
@@ -377,15 +380,18 @@ export function compareStrategies(
 ): StrategyComparison {
   const loans = createLoanSnapshots(loanData);
 
-  // Baseline: avalanche with zero extra = pay only minimums, no targeting.
-  // This is the most accurate "minimum-only" baseline because:
-  // - It always pays each loan's exact minimum (guaranteed)
-  // - With zero extra there is nothing to target, so all three strategies are identical
-  const baseline = simulateStrategy(loans, 0, 'avalanche');
+  // Budget surplus: how much the configured total exceeds per-loan minimums.
+  // This is the amount that gets directed to the priority loan each month.
+  const sumMins = loans.reduce((s, l) => s + l.minimumPayment, 0);
+  const budgetExtra = Math.max(0, loanData.totalMonthlyPayment - sumMins);
 
-  const avalanche = simulateStrategy(loans, extraPayment, 'avalanche');
-  const snowball  = simulateStrategy(loans, extraPayment, 'snowball');
-  const standard  = simulateStrategy(loans, extraPayment, 'standard');
+  // Baseline: the configured budget, avalanche ordering, no additional extra.
+  const baseline = simulateStrategy(loans, budgetExtra, 'avalanche');
+
+  const totalExtra = budgetExtra + extraPayment;
+  const avalanche = simulateStrategy(loans, totalExtra, 'avalanche');
+  const snowball  = simulateStrategy(loans, totalExtra, 'snowball');
+  const standard  = simulateStrategy(loans, totalExtra, 'standard');
 
   avalanche.interestSaved = baseline.totalInterest - avalanche.totalInterest;
   avalanche.monthsSaved   = baseline.totalMonths   - avalanche.totalMonths;

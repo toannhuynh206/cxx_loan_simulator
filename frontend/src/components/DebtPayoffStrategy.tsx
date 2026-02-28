@@ -14,15 +14,10 @@ interface DebtPayoffStrategyProps {
 }
 
 export const DebtPayoffStrategy: React.FC<DebtPayoffStrategyProps> = ({ loanData }) => {
-  // Seed extra payment from the budget surplus: what the user committed above minimums
-  const budgetSurplus = useMemo(() => {
-    const sumMins = loanData.loans.reduce(
-      (sum, l) => sum + (l.minimumPayment || l.monthlyPayment || 0), 0
-    );
-    return Math.max(0, Math.round(loanData.totalMonthlyPayment - sumMins));
-  }, [loanData]);
-
-  const [extraPayment, setExtraPayment] = useState<number>(() => budgetSurplus);
+  // Extra payment starts at $0 — represents additional above the configured budget.
+  // compareStrategies absorbs the budget surplus internally so the baseline is
+  // always "paying exactly what you configured", not the bare minimums.
+  const [extraPayment, setExtraPayment] = useState<number>(0);
   const [selectedStrategy, setSelectedStrategy] = useState<PayoffStrategyType>('avalanche');
 
   // Calculate strategy comparison whenever inputs change
@@ -33,9 +28,7 @@ export const DebtPayoffStrategy: React.FC<DebtPayoffStrategyProps> = ({ loanData
   // Get the selected strategy's result
   const selectedResult = comparison.strategies[selectedStrategy];
 
-  // Use the same snapshot logic so mortgage uses P&I only (not PITI)
-  const snapshots = useMemo(() => createLoanSnapshots(loanData), [loanData]);
-  const totalMinPayments = snapshots.reduce((sum, s) => sum + s.minimumPayment, 0);
+  const configuredBudget = Math.round(loanData.totalMonthlyPayment);
 
   return (
     <div className="debt-payoff-strategy">
@@ -50,7 +43,8 @@ export const DebtPayoffStrategy: React.FC<DebtPayoffStrategyProps> = ({ loanData
         <ExtraPaymentInput
           value={extraPayment}
           onChange={setExtraPayment}
-          maxSuggested={Math.round(totalMinPayments * 0.5)}
+          baseBudget={configuredBudget}
+          maxSuggested={Math.round(configuredBudget * 0.5)}
         />
       </div>
 

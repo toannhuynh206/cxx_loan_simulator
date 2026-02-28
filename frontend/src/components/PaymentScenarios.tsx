@@ -53,7 +53,8 @@ export const PaymentScenarios: React.FC<PaymentScenariosProps> = ({ multiLoanDat
 
   const currentTotal = Math.round(multiLoanData.totalMonthlyPayment);
   const step = currentTotal <= 300 ? 25 : currentTotal <= 600 ? 50 : 100;
-  const base = Math.round(currentTotal / step) * step;
+  // Use exact current total as center so "current" row matches DebtPayoffStrategy baseline exactly
+  const base = currentTotal;
 
   // Navigation state: how many steps offset from the initial center (base)
   const [centerOffset, setCenterOffset] = useState(0);
