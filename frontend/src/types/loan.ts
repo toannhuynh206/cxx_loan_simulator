@@ -1,5 +1,6 @@
 // Loan Types
 export type LoanType = 'credit-card' | 'personal-loan' | 'auto-loan' | 'mortgage' | 'student-loan';
+export type LoanInputMode = 'future' | 'existing';
 
 export interface LoanTypeInfo {
   id: LoanType;
@@ -70,6 +71,7 @@ export interface PersonalLoanEntry extends BaseLoanEntry {
 // Auto Loan - uses shared monthly cycle accrual model with depreciation display
 export interface AutoLoanEntry extends BaseLoanEntry {
   type: 'auto-loan';
+  inputMode: LoanInputMode;
   interestRate: number; // APR input for auto loan
   termMonths: number; // 36, 48, 60, 72, 84 months
   vehiclePrice: number;
@@ -83,6 +85,7 @@ export interface AutoLoanEntry extends BaseLoanEntry {
 // Mortgage - PITI with PMI tracking
 export interface MortgageEntry extends BaseLoanEntry {
   type: 'mortgage';
+  inputMode: LoanInputMode;
   interestRate: number; // Fixed rate
   termYears: number; // 15, 20, or 30 years
   homePrice: number;

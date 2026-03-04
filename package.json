@@ -1,0 +1,10 @@
+{
+  "name": "loan-simulation",
+  "private": true,
+  "scripts": {
+    "start": "docker compose up --build",
+    "start:detached": "docker compose up -d --build",
+    "stop": "docker compose down",
+    "logs": "docker compose logs -f --tail=120"
+  }
+}

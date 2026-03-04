@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { CombinedLoanResult } from '../types/loan';
 import { PayoffStrategyType, StrategyComparison } from '../types/payoffStrategy';
-import { compareStrategies, createLoanSnapshots } from '../services/payoffStrategyService';
+import { compareStrategies } from '../services/payoffStrategyService';
 import { ExtraPaymentInput } from './ExtraPaymentInput';
 import { StrategySelector } from './StrategySelector';
 import { StrategyComparisonTable } from './StrategyComparisonTable';

@@ -1,1 +1,13 @@
 .gitnexus
+
+# macOS
+.DS_Store
+
+# Frontend generated artifacts
+frontend/node_modules/
+frontend/package-lock.json
+frontend/dist/
+
+# Backend generated artifacts
+backend/build/
+backend/logs/

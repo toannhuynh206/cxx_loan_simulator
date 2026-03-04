@@ -148,6 +148,7 @@ struct AutoLoanEntry {
     double tradeInPayoff;
     int vehicleYear;
     bool isUsed;
+    std::string inputMode; // "future" (planning) or "existing" (active loan)
     double monthlyPayment;  // Optional: if > calculated amortization, extra is applied to principal
 
     static AutoLoanEntry fromJson(const Json::Value& json) {
@@ -164,6 +165,7 @@ struct AutoLoanEntry {
         entry.tradeInPayoff = json.get("tradeInPayoff", 0.0).asDouble();
         entry.vehicleYear = json.get("vehicleYear", 2024).asInt();
         entry.isUsed = json.get("isUsed", false).asBool();
+        entry.inputMode = json.get("inputMode", "future").asString();
         entry.monthlyPayment = json.get("monthlyPayment", 0.0).asDouble();
         return entry;
     }
@@ -185,6 +187,8 @@ struct MortgageEntry {
     double pmiRate;
     double hoaMonthly;
     bool includeEscrow;
+    std::string inputMode; // "future" (planning) or "existing" (active loan)
+    double monthlyPayment; // Existing-loan known P&I payment
 
     static MortgageEntry fromJson(const Json::Value& json) {
         MortgageEntry entry;
@@ -202,6 +206,8 @@ struct MortgageEntry {
         entry.pmiRate = json.get("pmiRate", 0.5).asDouble();
         entry.hoaMonthly = json.get("hoaMonthly", 0.0).asDouble();
         entry.includeEscrow = json.get("includeEscrow", true).asBool();
+        entry.inputMode = json.get("inputMode", "future").asString();
+        entry.monthlyPayment = json.get("monthlyPayment", 0.0).asDouble();
         return entry;
     }
 };

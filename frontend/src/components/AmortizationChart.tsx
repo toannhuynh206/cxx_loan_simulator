@@ -45,6 +45,7 @@ interface Milestone {
 
 export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, multiLoanData, viewMode, onViewModeChange }) => {
   const { theme } = useTheme();
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 480;
   const totalMonths = data.totalMonths;
   const hasMultipleLoans = !!multiLoanData && multiLoanData.loans.length > 1;
 
@@ -207,6 +208,12 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
   const formatCurrencyFull = (value: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
+  const formatCurrencyMobile = (value: number) => {
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  };
+
   // ── TOOLTIPS ────────────────────────────────────────────────
   interface CombinedTooltipProps {
     active?: boolean;
@@ -349,8 +356,8 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
       tickFormatter={(v) => `${Math.round(v)}`}
       axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
       tickLine={{ stroke: colors.axis }}
-      tick={{ fill: colors.text, fontSize: 12 }}
-      label={{ value: 'Month', position: 'bottom', offset: 10, fill: colors.text, fontSize: 14 }}
+      tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
+      label={isMobile ? undefined : { value: 'Month', position: 'bottom', offset: 10, fill: colors.text, fontSize: 14 }}
       allowDataOverflow
     />
   );
@@ -358,12 +365,12 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
   const sharedYAxis = (domain: [number, number]) => (
     <YAxis
       domain={domain}
-      tickFormatter={formatCurrency}
+      tickFormatter={isMobile ? formatCurrencyMobile : formatCurrency}
       axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
       tickLine={{ stroke: colors.axis }}
-      tick={{ fill: colors.text, fontSize: 12 }}
-      label={{ value: 'Balance', angle: -90, position: 'insideLeft', offset: -45, fill: colors.text, fontSize: 14 }}
-      width={80}
+      tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
+      label={isMobile ? undefined : { value: 'Balance', angle: -90, position: 'insideLeft', offset: -45, fill: colors.text, fontSize: 14 }}
+      width={isMobile ? 48 : 80}
     />
   );
 
@@ -493,7 +500,7 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
 
           {/* COMBINED CHART */}
           {viewMode === 'combined' ? (
-            <ComposedChart data={displayedChartData} margin={{ top: 20, right: 40, left: 60, bottom: 30 }}>
+            <ComposedChart data={displayedChartData} margin={isMobile ? { top: 8, right: 8, left: 0, bottom: 16 } : { top: 20, right: 40, left: 0, bottom: 30 }}>
               {sharedXAxis}
               {sharedYAxis([yBounds.min, yBounds.max])}
               <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} opacity={0.5} />
@@ -524,7 +531,7 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
 
           ) : (
             /* PER-LOAN CHART */
-            <ComposedChart data={perLoanChartData} margin={{ top: 20, right: 40, left: 60, bottom: 30 }}>
+            <ComposedChart data={perLoanChartData} margin={isMobile ? { top: 8, right: 8, left: 0, bottom: 16 } : { top: 20, right: 40, left: 0, bottom: 30 }}>
               {sharedXAxis}
               {sharedYAxis([perLoanYBounds.min, perLoanYBounds.max])}
               <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} opacity={0.5} />

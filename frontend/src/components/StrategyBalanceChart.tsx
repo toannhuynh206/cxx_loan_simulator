@@ -40,6 +40,12 @@ const LOAN_COLORS = [
 
 export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ result, selectedStrategy, originalLoans }) => {
   const { theme } = useTheme();
+  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 480;
+  const formatCurrencyMobile = (value: number) => {
+    if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
+    if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
+    return `$${value.toFixed(0)}`;
+  };
   const [hoveredLoan, setHoveredLoan] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -209,7 +215,7 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
-            margin={{ top: 20, right: 30, left: 60, bottom: 30 }}
+            margin={isMobile ? { top: 8, right: 8, left: 0, bottom: 16 } : { top: 20, right: 30, left: 0, bottom: 30 }}
           >
             <CartesianGrid
               strokeDasharray="3 3"
@@ -222,8 +228,8 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
               domain={[0, result.totalMonths]}
               axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
               tickLine={{ stroke: colors.axis }}
-              tick={{ fill: colors.text, fontSize: 12 }}
-              label={{
+              tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
+              label={isMobile ? undefined : {
                 value: 'Month',
                 position: 'bottom',
                 offset: 10,
@@ -233,11 +239,11 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
             />
             <YAxis
               domain={[0, yMax]}
-              tickFormatter={(value) => formatCurrency(value)}
+              tickFormatter={isMobile ? formatCurrencyMobile : formatCurrency}
               axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
               tickLine={{ stroke: colors.axis }}
-              tick={{ fill: colors.text, fontSize: 12 }}
-              label={{
+              tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
+              label={isMobile ? undefined : {
                 value: 'Balance',
                 angle: -90,
                 position: 'insideLeft',
@@ -245,7 +251,7 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
                 fill: colors.text,
                 fontSize: 14
               }}
-              width={80}
+              width={isMobile ? 48 : 80}
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend

@@ -27,7 +27,9 @@ function findExtraForTarget(
 
   const totalBalance = snapshots.reduce((s, l) => s + l.balance, 0);
   let lo = 0;
-  let hi = Math.ceil(totalBalance);
+  // hi = 2× total balance handles cases where required extra exceeds balance
+  // (e.g., large principal at low APR with a tight target timeline)
+  let hi = Math.ceil(totalBalance) * 2;
 
   while (lo < hi) {
     const mid = Math.floor((lo + hi) / 2);

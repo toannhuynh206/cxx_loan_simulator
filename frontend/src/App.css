@@ -305,6 +305,14 @@ header p {
   transform: translateX(32px);
 }
 
+@media (max-width: 480px) {
+  /* Recalculate thumb travel for 52px-wide mobile toggle:
+     52px track - 4px left - 18px thumb - 4px right = 26px travel */
+  [data-theme="dark"] .theme-toggle__thumb {
+    transform: translateX(26px);
+  }
+}
+
 .theme-toggle__icons {
   position: absolute;
   inset: 0;
@@ -721,6 +729,20 @@ main {
   gap: var(--space-4);
 }
 
+.loan-entry__mode {
+  margin-bottom: var(--space-3);
+}
+
+.loan-entry__mode .mode-toggle {
+  margin-bottom: var(--space-2);
+}
+
+.loan-entry__mode-helper {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+}
+
 .loan-entry__fields .form-group {
   gap: var(--space-1);
 }
@@ -991,7 +1013,8 @@ main {
 /* Mobile tooltip adjustments */
 @media (max-width: 480px) {
   .info-tooltip__content {
-    width: 240px;
+    width: auto;
+    max-width: min(240px, calc(100vw - 32px));
     padding: var(--space-3);
     left: auto;
     right: -8px;
@@ -3566,6 +3589,7 @@ main {
 
 .table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   margin-bottom: var(--space-4);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
@@ -3787,6 +3811,53 @@ main {
   transform: translateY(0);
 }
 
+.fab-nav-pill {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.fab-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: none;
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.fab-nav-btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.fab-nav-btn:first-child {
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.fab-nav-btn:hover:not(.active) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.fab-nav-btn.active {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
 @media (max-width: 480px) {
   .fab-container {
     bottom: var(--space-4);
@@ -3804,6 +3875,15 @@ main {
 
   .fab span {
     display: none;
+  }
+
+  .fab-nav-btn span {
+    display: none;
+  }
+
+  .fab-nav-btn {
+    padding: var(--space-3);
+    justify-content: center;
   }
 }
 
@@ -3948,6 +4028,56 @@ footer {
     white-space: normal;
   }
 
+  .header-tagline {
+    font-size: 1rem;
+    letter-spacing: 0;
+  }
+
+  /* Header layout: tighten logo size on mobile */
+  .header-logo {
+    width: 36px;
+    height: 36px;
+  }
+
+  /* Theme toggle — compact size for mobile
+     Track: 52×26px  |  Thumb: 18×18px  |  Travel: 28px */
+  .theme-toggle {
+    width: 52px;
+    height: 26px;
+    align-self: center;
+    margin-top: 0;
+  }
+
+  .theme-toggle__thumb {
+    width: 18px;
+    height: 18px;
+    top: 4px;
+    left: 4px;
+  }
+
+  .theme-toggle__icons {
+    padding: 0 5px;
+  }
+
+  .theme-toggle__sun,
+  .theme-toggle__moon {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* App tab nav — full-width pill on mobile */
+  .app-tab-nav {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .app-tab {
+    flex: 1;
+    text-align: center;
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.875rem;
+  }
+
   .card {
     padding: var(--space-5);
     border-radius: var(--radius-md);
@@ -4047,6 +4177,25 @@ footer {
     min-height: 56px;
   }
 
+  /* Per-loan tab stats — wrap to 2×2 grid on mobile */
+  .loan-tab-stats {
+    flex-wrap: wrap;
+  }
+
+  .loan-tab-stat {
+    flex: 1 1 calc(50% - 1px);
+    min-width: 0;
+  }
+
+  .loan-tab-stat .stat-value {
+    font-size: 0.85rem;
+  }
+
+  /* Per-loan tab names — tighter on mobile */
+  .loan-tab-name {
+    max-width: 80px;
+  }
+
   /* Summary grid on mobile */
   .summary-grid {
     gap: var(--space-3);
@@ -4105,7 +4254,7 @@ footer {
   }
 
   .chart-wrapper {
-    height: 320px;
+    height: 420px;
   }
 
   .chart-legend {
@@ -5231,6 +5380,7 @@ button:focus-visible {
 
 .loan-table-wrapper {
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   max-height: 400px;
   overflow-y: auto;
 }
@@ -5665,6 +5815,8 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .scenario-navigable .scenario-table {
@@ -5805,5 +5957,1409 @@ button:focus-visible {
   .scenarios-header {
     flex-direction: column;
     gap: var(--space-1);
+  }
+}
+
+/* ============================================
+   APP TAB NAVIGATION
+   ============================================ */
+
+.app-tab-nav {
+  display: flex;
+  gap: var(--space-2);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  width: fit-content;
+  margin-bottom: var(--space-6);
+}
+
+.app-tab {
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.app-tab:hover:not(.active) {
+  color: var(--color-text-primary);
+  background: var(--color-bg-hover);
+}
+
+.app-tab.active {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
+
+
+/* ============================================
+   HOW IT WORKS  —  Full Redesign
+   ============================================ */
+
+.how-it-works-section {
+  padding: var(--space-7);
+}
+
+.how-it-works {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* ── Page header ── */
+
+.hiw-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hiw-page-title {
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.hiw-loan-badge {
+  display: inline-block;
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px var(--space-3);
+  letter-spacing: 0.03em;
+  width: fit-content;
+}
+
+.hiw-page-sub {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Example banner ── */
+
+.hiw-example-banner {
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.9rem;
+  color: var(--color-accent);
+}
+
+/* ── Section wrapper ── */
+
+.hiw-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Section header (badge + title) ── */
+
+.hiw-section-hd {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.hiw-sec-num {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  opacity: 0.25;
+  line-height: 1;
+  min-width: 36px;
+  margin-top: 2px;
+  letter-spacing: -0.02em;
+}
+
+.hiw-sec-title {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-1);
+  line-height: 1.3;
+}
+
+.hiw-sec-sub {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Section 1: Triad cards (P · r · M) ── */
+
+.hiw-triad {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+}
+
+.hiw-triad-card {
+  flex: 1;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  position: relative;
+}
+
+.hiw-triad-card--hi {
+  background: var(--color-bg-secondary);
+  border-color: var(--color-accent-muted);
+  box-shadow: 0 0 0 1px var(--color-accent-muted), 0 4px 20px color-mix(in srgb, var(--color-accent) 12%, transparent);
+  z-index: 1;
+}
+
+.hiw-triad-glyph {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--color-text-secondary);
+  font-style: italic;
+}
+
+.hiw-triad-glyph--hi {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+.hiw-triad-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-triad-val {
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hiw-triad-card--hi .hiw-triad-val {
+  color: var(--color-accent);
+}
+
+.hiw-triad-desc {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.hiw-triad-arrow {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-2);
+  color: var(--color-text-tertiary);
+}
+
+.hiw-triad-arrow svg {
+  width: 36px;
+  height: 18px;
+}
+
+/* ── APR rate strip ── */
+
+.hiw-rate-strip {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.hiw-rate-strip-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-rate-strip-flow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.hiw-rate-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  gap: 2px;
+}
+
+.hiw-rate-chip-val {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.hiw-rate-chip-desc {
+  font-size: 0.6875rem;
+  color: var(--color-text-tertiary);
+  white-space: nowrap;
+}
+
+.hiw-rate-op {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Note callout ── */
+
+.hiw-note {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-tertiary);
+  border-left: 3px solid var(--color-accent-muted);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: var(--space-3) var(--space-4);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Section 2: Payment cycle flow ── */
+
+.hiw-cycle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  overflow-x: auto;
+}
+
+.hiw-cycle-node {
+  flex: 1;
+  min-width: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+}
+
+.hiw-cycle-tag {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: 1px var(--space-2);
+  width: fit-content;
+}
+
+.hiw-cycle-node--pay .hiw-cycle-tag,
+.hiw-cycle-tag--pay {
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-bg-secondary));
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+  color: var(--color-success);
+}
+
+.hiw-cycle-node--down .hiw-cycle-tag,
+.hiw-cycle-tag--down {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+
+.hiw-cycle-node--int .hiw-cycle-tag,
+.hiw-cycle-tag--int {
+  background: color-mix(in srgb, var(--color-error) 10%, var(--color-bg-secondary));
+  border-color: color-mix(in srgb, var(--color-error) 25%, transparent);
+  color: var(--color-error);
+}
+
+.hiw-cycle-big {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hiw-cycle-node--pay .hiw-cycle-big { color: var(--color-success); }
+.hiw-cycle-node--down .hiw-cycle-big { color: var(--color-accent); }
+.hiw-cycle-node--int .hiw-cycle-big { color: var(--color-error); }
+
+.hiw-cycle-caption {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-cycle-split {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: var(--space-1);
+}
+
+.hiw-cycle-split-i,
+.hiw-cycle-split-p {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px var(--space-2);
+  border-radius: 4px;
+  width: fit-content;
+}
+
+.hiw-cycle-split-i {
+  background: color-mix(in srgb, var(--color-error) 10%, transparent);
+  color: var(--color-error);
+}
+
+.hiw-cycle-split-p {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.hiw-cycle-pipe {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 2px;
+  margin-top: 28px;
+  gap: 0;
+}
+
+.hiw-cycle-pipe-line {
+  height: 1px;
+  width: 18px;
+  background: var(--color-border);
+}
+
+.hiw-cycle-pipe-chevron {
+  font-size: 1.25rem;
+  color: var(--color-text-tertiary);
+  line-height: 1;
+  margin-left: -2px;
+}
+
+/* ── 30-day calendar ── */
+
+@keyframes hiwCalIn {
+  from { opacity: 0; transform: translateY(5px) scale(0.93); }
+  to   { opacity: 1; transform: none; }
+}
+
+.hiw-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+/* Day 1 — payment cell */
+.hiw-cal-day--paid {
+  background: var(--color-success);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: hiwCalIn 0.35s ease both;
+}
+
+.hiw-cal-day--paid .hiw-cal-daynum {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.75);
+}
+
+.hiw-cal-paid-badge {
+  font-size: 0.55rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.9);
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+  padding: 1px 4px;
+  width: fit-content;
+}
+
+.hiw-cal-paid-amt {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.1;
+}
+
+.hiw-cal-paid-bal {
+  font-size: 0.6rem;
+  color: rgba(255,255,255,0.7);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Days 2–30 — interest cells with intensity gradient */
+.hiw-cal-day--int {
+  background: color-mix(
+    in srgb,
+    var(--color-error) calc(var(--intensity, 0) * 18% + 5%),
+    var(--color-bg-tertiary)
+  );
+  border: 1px solid color-mix(
+    in srgb,
+    var(--color-error) calc(var(--intensity, 0) * 20% + 8%),
+    var(--color-border-subtle)
+  );
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  animation: hiwCalIn 0.3s ease both;
+  animation-delay: calc(var(--day-index, 0) * 18ms);
+}
+
+.hiw-cal-daynum {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-cal-day--int .hiw-cal-daynum {
+  color: color-mix(in srgb, var(--color-error) 70%, var(--color-text-tertiary));
+}
+
+.hiw-cal-cost {
+  font-family: var(--font-display);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--color-error);
+  line-height: 1;
+}
+
+.hiw-cal-day--empty {
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+/* Calendar total bar */
+.hiw-cal-total {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  background: color-mix(in srgb, var(--color-error) 8%, var(--color-bg-tertiary));
+  border: 1px solid color-mix(in srgb, var(--color-error) 20%, var(--color-border-subtle));
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-5);
+}
+
+.hiw-cal-total-math {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+.hiw-cal-total-eq {
+  font-size: 0.875rem;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-cal-total-result {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-error);
+}
+
+.hiw-cal-total-label {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-cycle-disclaimer {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  line-height: 1.55;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 2px solid var(--color-border);
+}
+
+/* ── Section 3: Algorithm blocks ── */
+
+.hiw-algo-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5) var(--space-6);
+}
+
+.hiw-algo-block-title {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+/* Loan term cards */
+.hiw-term-cards {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.hiw-term-card {
+  flex: 1;
+  min-width: 110px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.hiw-term-card--cc {
+  flex: 1.4;
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
+}
+
+.hiw-term-card-type {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-term-card-term {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.hiw-term-card--cc .hiw-term-card-term {
+  color: var(--color-accent);
+}
+
+.hiw-term-card-note {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.4;
+}
+
+/* Formula display */
+.hiw-formula-display {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-subtle);
+}
+
+.hiw-formula-lhs {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  align-self: center;
+  font-style: italic;
+}
+
+.hiw-formula-fraction {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  align-self: center;
+}
+
+.hiw-formula-num,
+.hiw-formula-den {
+  font-size: 0.9375rem;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  padding: 2px var(--space-2);
+}
+
+.hiw-formula-num {
+  border-bottom: none;
+}
+
+.hiw-formula-bar {
+  width: 100%;
+  height: 2px;
+  background: var(--color-text-primary);
+  border-radius: 1px;
+}
+
+.hiw-formula-legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  align-self: center;
+}
+
+.hiw-formula-legend strong {
+  font-family: var(--font-display);
+  color: var(--color-text-primary);
+  font-style: italic;
+}
+
+.hiw-formula-result {
+  font-weight: 700;
+  color: var(--color-accent);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.hiw-formula-footnote {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  text-align: center;
+  margin: 0;
+}
+
+/* Assumptions box */
+.hiw-assumptions {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-5);
+}
+
+.hiw-assumptions-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-warning);
+  margin-bottom: var(--space-3);
+}
+
+.hiw-assumptions-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.hiw-assumptions-list li {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+}
+
+/* Trace intro */
+.hiw-trace-intro {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Month trace table */
+.hiw-trace-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.hiw-trace-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.hiw-trace-table th {
+  background: var(--color-bg-secondary);
+  padding: var(--space-2) var(--space-3);
+  text-align: right;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  border-bottom: 2px solid var(--color-border);
+}
+
+.hiw-trace-table th:first-child,
+.hiw-trace-table td:first-child { text-align: left; }
+
+.hiw-trace-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: right;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-variant-numeric: tabular-nums;
+}
+
+.hiw-trace-table tbody tr:hover { background: var(--color-bg-hover); }
+
+.hiw-trace-month { font-weight: 600; color: var(--color-text-secondary); }
+
+.hiw-col-interest { color: var(--color-error) !important; }
+.hiw-col-principal { color: var(--color-accent) !important; }
+
+.hiw-trace-ellipsis td {
+  text-align: center !important;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  padding: var(--space-2);
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.hiw-trace-last { background: var(--color-accent-subtle); }
+.hiw-trace-last:hover { background: var(--color-accent-subtle) !important; }
+.hiw-trace-zero { color: var(--color-success) !important; font-weight: 700; }
+
+/* Cascade diagram */
+.hiw-cascade-diagram {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.hiw-cascade-budget {
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-6);
+  text-align: center;
+}
+
+.hiw-cascade-budget-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+}
+
+.hiw-cascade-budget-amount {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.hiw-cascade-arrow-down {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+.hiw-cascade-step {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: var(--color-bg-secondary);
+}
+
+.hiw-cascade-step--priority {
+  border-color: var(--color-accent-muted);
+  background: var(--color-accent-subtle);
+}
+
+.hiw-cascade-step--freed {
+  border-color: var(--color-success-subtle);
+  background: var(--color-success-subtle);
+}
+
+.hiw-cascade-step-label {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.hiw-cascade-loans {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.hiw-cascade-loan-chip {
+  flex: 1;
+  min-width: 110px;
+  padding: var(--space-3);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.hiw-cascade-loan-chip--priority {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+}
+
+.hiw-cascade-loan-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hiw-cascade-loan-apr {
+  font-size: 0.6875rem;
+  color: var(--color-text-tertiary);
+  margin: 2px 0;
+}
+
+.hiw-cascade-loan-chip--priority .hiw-cascade-loan-apr {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+.hiw-cascade-loan-min {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.hiw-cascade-surplus-bar {
+  height: 32px;
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.hiw-cascade-surplus-fill {
+  height: 100%;
+  width: var(--bar-pct, 0%);
+  background: var(--color-accent);
+  display: flex;
+  align-items: center;
+  padding-left: var(--space-3);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: white;
+  transition: width 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+}
+
+.hiw-cascade-freed-desc {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── Section 4: Loan Type Guide ── */
+
+.hiw-loan-tabs {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+}
+
+.hiw-loan-tab {
+  flex: 1;
+  min-width: 90px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.hiw-loan-tab:hover:not(.hiw-loan-tab--active) {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.hiw-loan-tab--active {
+  background: var(--color-bg-secondary);
+  color: var(--color-accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+}
+
+.hiw-loan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  animation: hiwPanelIn 0.2s ease both;
+}
+
+@keyframes hiwPanelIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.hiw-loan-tagline {
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-tertiary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-accent);
+}
+
+.hiw-loan-insights {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-4);
+}
+
+.hiw-loan-insight {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.hiw-loan-insight-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.hiw-loan-insight-title {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.hiw-loan-insight-body {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+  flex: 1;
+}
+
+.hiw-loan-callout {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  text-align: center;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 820px) {
+  .hiw-triad {
+    flex-direction: column;
+  }
+
+  .hiw-triad-arrow {
+    transform: rotate(90deg);
+    padding: var(--space-1) 0;
+    justify-content: center;
+  }
+
+  .hiw-cycle {
+    flex-wrap: wrap;
+    gap: var(--space-3);
+  }
+
+  .hiw-cycle-pipe { display: none; }
+
+  .hiw-cycle-node {
+    min-width: 140px;
+    flex: 0 1 calc(50% - var(--space-3));
+  }
+}
+
+@media (max-width: 600px) {
+  .how-it-works-section {
+    padding: var(--space-5);
+  }
+
+  .hiw-triad-val {
+    font-size: 1.375rem;
+  }
+
+  .hiw-cal-day--paid {
+    padding: var(--space-1);
+  }
+
+  .hiw-cal-paid-amt {
+    font-size: 0.65rem;
+  }
+
+  .hiw-cal-cost {
+    font-size: 0.6rem;
+  }
+
+  .hiw-cal-total {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  .hiw-rate-strip-flow {
+    gap: var(--space-2);
+  }
+
+  .hiw-loan-insights {
+    grid-template-columns: 1fr;
+  }
+
+  .hiw-loan-tab {
+    flex: 0 1 auto;
+    font-size: 0.75rem;
+    padding: var(--space-2) var(--space-3);
+  }
+}
+
+/* ============================================
+   IPHONE / EXTRA-SMALL (≤ 430px)
+   Targets iPhone SE (375px) through iPhone 15 Pro Max (430px)
+   ============================================ */
+@media (max-width: 430px) {
+
+  /* ── How It Works: Calendar ──────────────────
+     Switch from 7-col to 5-col so each cell is
+     ~60px wide (readable) instead of ~44px.
+     Hide trailing empty cells so rows are even. */
+  .hiw-calendar {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+  }
+
+  .hiw-cal-day--empty {
+    display: none;
+  }
+
+  /* Paid cell needs a bit more internal breathing room */
+  .hiw-cal-day--paid {
+    padding: var(--space-2);
+    gap: 3px;
+  }
+
+  .hiw-cal-paid-amt {
+    font-size: 0.7rem;
+  }
+
+  .hiw-cal-paid-bal {
+    font-size: 0.55rem;
+  }
+
+  .hiw-cal-cost {
+    font-size: 0.65rem;
+  }
+
+  /* ── How It Works: page / section headers ─── */
+  .hiw-page-title {
+    font-size: 1.25rem;
+  }
+
+  .hiw-sec-num {
+    font-size: 1.125rem;
+    min-width: 28px;
+  }
+
+  /* ── How It Works: cycle flow ────────────────
+     Let nodes shrink to fit 2-per-row on 375px */
+  .hiw-cycle-node {
+    min-width: 80px;
+    padding: var(--space-2);
+  }
+
+  .hiw-cycle-big {
+    font-size: 1.1rem;
+  }
+
+  /* ── How It Works: rate strip ─────────────── */
+  .hiw-rate-chip {
+    font-size: 0.75rem;
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .hiw-rate-op {
+    font-size: 0.75rem;
+  }
+
+  /* ── How It Works: payment bars ─────────────
+     Label + bar stay readable */
+  .hiw-bar-label {
+    min-width: 55px;
+    font-size: 0.75rem;
+  }
+
+  .hiw-bar-interest,
+  .hiw-bar-principal {
+    font-size: 0.65rem;
+  }
+
+  /* ── HIW loan guide tabs ─────────────────── */
+  .hiw-loan-tabs {
+    gap: var(--space-1);
+  }
+
+  .hiw-loan-tab {
+    font-size: 0.7rem;
+    padding: var(--space-1) var(--space-2);
+    min-width: 0;
+  }
+
+  /* ── App-level adjustments ───────────────── */
+
+  /* Reduce outer card padding further on very narrow screens */
+  .how-it-works-section {
+    padding: var(--space-4);
+  }
+
+  /* Amortization table: further tighten cells */
+  .amortization-table {
+    font-size: 0.8125rem;
+  }
+
+  .amortization-table th,
+  .amortization-table td {
+    padding: var(--space-1) 6px;
+    font-size: 0.75rem;
+  }
+
+  /* Hide the "Net Progress" column on very small screens
+     to keep the table readable without horizontal scroll */
+  .amortization-table .net-progress-col,
+  .amortization-table th:nth-child(5) {
+    display: none;
+  }
+
+  /* Loan stats bar below per-loan tab — make values slightly smaller */
+  .loan-tab-stat .stat-value {
+    font-size: 0.8rem;
+  }
+
+  .loan-tab-stat .stat-label {
+    font-size: 0.6rem;
+  }
+
+  /* Scenario tables: stack nav arrows on top, no side-scroll needed */
+  .scenario-navigable {
+    flex-direction: column;
+    align-items: stretch;
+    overflow-x: visible;
+  }
+
+  .scenario-nav-arrows {
+    flex-direction: row;
+    justify-content: center;
+    gap: var(--space-3);
+  }
+
+  .scenario-nav-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 14px;
+  }
+
+  /* Charts: taller on mobile so data is readable */
+  .chart-wrapper {
+    height: 420px;
+  }
+
+  .strategy-chart-wrapper {
+    height: 380px;
+  }
+
+  /* Strategy section: tighten comparison cards */
+  .comparison-card {
+    padding: var(--space-3);
+  }
+
+  .comparison-stat__value {
+    font-size: 1rem;
+  }
+
+  /* ── How It Works: Section 3 formula ────────
+     Reduce formula font and let it wrap cleanly */
+  .hiw-formula-lhs {
+    font-size: 1.375rem;
+  }
+
+  .hiw-formula-num,
+  .hiw-formula-den {
+    font-size: 0.8125rem;
+  }
+
+  .hiw-formula-display {
+    padding: var(--space-4);
+    gap: var(--space-3);
+  }
+
+  /* Term cards: 2-up instead of wrapping oddly */
+  .hiw-term-card {
+    min-width: 90px;
+    padding: var(--space-3);
+  }
+
+  /* Algo block inner padding */
+  .hiw-algo-block {
+    padding: var(--space-4);
+  }
+
+  /* HIW section 3 trace table: smaller text */
+  .hiw-trace-table {
+    font-size: 0.75rem;
+  }
+
+  .hiw-trace-table th,
+  .hiw-trace-table td {
+    padding: var(--space-1) var(--space-2);
+  }
+}
+
+/* ============================================
+   MOBILE PROPORTION FIXES — overall feel
+   ============================================ */
+@media (max-width: 480px) {
+
+  /* More vertical space between sections */
+  main {
+    gap: var(--space-5);
+  }
+
+  /* Summary card values — bigger and bolder so they read like a native app */
+  .summary-item .value {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  /* Cards: slightly less horizontal padding so content breathes */
+  .card {
+    padding: var(--space-4) var(--space-4);
+  }
+
+  /* Section titles: make them pop on mobile */
+  .amortization-table-container h3,
+  .breakdown-container h3,
+  .chart-container h3 {
+    font-size: 1.125rem;
+  }
+
+  /* Pie chart: give it more room on mobile */
+  .breakdown-chart {
+    min-height: 220px;
+  }
+
+  /* Payment scenarios: compact the table padding */
+  .scenario-table th,
+  .scenario-table td {
+    padding: var(--space-2) var(--space-2);
+    font-size: 0.8125rem;
+  }
+
+  /* Strategy chart: taller */
+  .strategy-chart-wrapper {
+    height: 380px;
+  }
+
+  /* Debt payoff accordion: reduce padding */
+  .loan-accordion__header {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .loan-accordion__summary {
+    display: none;
   }
 }

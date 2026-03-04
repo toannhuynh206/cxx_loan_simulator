@@ -368,6 +368,9 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
     if (entry.downPayment < 0 || entry.tradeInValue < 0 || entry.tradeInPayoff < 0) {
         throw std::invalid_argument("Auto loan optional amounts cannot be negative");
     }
+    if (entry.monthlyPayment < 0) {
+        throw std::invalid_argument("Auto loan monthlyPayment cannot be negative");
+    }
 
     LoanCalculationResult result;
     result.loanId = entry.id;
@@ -385,9 +388,21 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
     // Auto loans use the actuarial monthly model: APR / 12
     double rate = installmentMonthlyRate(entry.interestRate);
     double calculatedPayment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
-    // Use provided payment if it exceeds the standard payment (e.g., extra allocation directed here).
-    // Never go below the amortization minimum — that would cause negative amortization.
-    double payment = (entry.monthlyPayment > calculatedPayment) ? entry.monthlyPayment : calculatedPayment;
+    const bool existingMode = entry.inputMode == "existing";
+    double payment = calculatedPayment;
+
+    if (existingMode) {
+        if (entry.monthlyPayment <= 0) {
+            throw std::invalid_argument("Auto loan monthlyPayment must be greater than 0 in existing mode");
+        }
+        // Existing-loan mode trusts the user's contractual minimum payment.
+        payment = entry.monthlyPayment;
+    } else {
+        // Future mode defaults to amortized payment; allow optional extra payment.
+        payment = (entry.monthlyPayment > calculatedPayment) ? entry.monthlyPayment : calculatedPayment;
+    }
+    validatePaymentCoversFirstMonthInterest(entry.balance, rate, payment, "Auto loan");
+
     result.monthlyPayment = payment;
 
     double vehicleValue = entry.vehiclePrice;
@@ -440,6 +455,9 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
         entry.homeInsuranceAnnual < 0 || entry.pmiRate < 0 || entry.hoaMonthly < 0) {
         throw std::invalid_argument("Mortgage optional amounts cannot be negative");
     }
+    if (entry.monthlyPayment < 0) {
+        throw std::invalid_argument("Mortgage monthlyPayment cannot be negative");
+    }
 
     LoanCalculationResult result;
     result.loanId = entry.id;
@@ -458,7 +476,17 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 
     // Mortgage uses the actuarial monthly model: APR / 12
     double rate = installmentMonthlyRate(entry.interestRate);
-    double piPayment = calculateAmortizationPayment(entry.balance, rate, termMonths);
+    const bool existingMode = entry.inputMode == "existing";
+    const double calculatedPiPayment = calculateAmortizationPayment(entry.balance, rate, termMonths);
+    double piPayment = calculatedPiPayment;
+    if (existingMode) {
+        if (entry.monthlyPayment <= 0) {
+            throw std::invalid_argument("Mortgage monthlyPayment must be greater than 0 in existing mode");
+        }
+        // Existing-loan mode expects the known P&I payment from statement.
+        piPayment = entry.monthlyPayment;
+    }
+    validatePaymentCoversFirstMonthInterest(entry.balance, rate, piPayment, "Mortgage");
 
     double monthlyTax = entry.propertyTaxAnnual / 12.0;
     double monthlyInsurance = entry.homeInsuranceAnnual / 12.0;
@@ -542,7 +570,7 @@ LoanCalculationResult AmortizationCalculator::calculateStudentLoan(const Student
     } else if (entry.repaymentPlan == "graduated") {
         termMonths = 120;
     } else {
-        termMonths = 300;
+        termMonths = 120; // Default to standard 10-year plan (120 months)
     }
 
     // Student loans use the actuarial monthly model: APR / 12
