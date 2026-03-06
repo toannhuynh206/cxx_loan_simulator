@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { LoanInput } from './components/LoanInput';
 import { AmortizationChart } from './components/AmortizationChart';
 import { ResultsSummary } from './components/ResultsSummary';
@@ -8,6 +8,8 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { DebtPayoffStrategy } from './components/DebtPayoffStrategy';
 import { PaymentScenarios } from './components/PaymentScenarios';
 import { HowItWorks } from './components/HowItWorks';
+import { MobileApp } from './components/MobileApp';
+import { useMobileLayout } from './hooks/useMobileLayout';
 import { calculateMultipleLoans, calculateCascade } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
 import { PayoffStrategyType } from './types/payoffStrategy';
@@ -17,6 +19,7 @@ import './App.css';
 type MobileResultsTab = 'overview' | 'balance' | 'schedule' | 'more';
 
 function App() {
+  const isMobile = useMobileLayout();
   const [multiLoanData, setMultiLoanData] = useState<CombinedLoanResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +27,16 @@ function App() {
   const [viewMode, setViewMode] = useState<'combined' | 'per-loan'>('per-loan');
   const [activeView, setActiveView] = useState<'calculator' | 'how-it-works'>('calculator');
   const [mobileResultsTab, setMobileResultsTab] = useState<MobileResultsTab>('overview');
+  const resultsTabRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to results tab bar on mobile after calculation
+  useEffect(() => {
+    if (multiLoanData && window.innerWidth <= 768) {
+      setTimeout(() => {
+        resultsTabRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    }
+  }, [multiLoanData]);
 
   // Reset all state to initial values
   const handleReset = () => {
@@ -125,6 +138,21 @@ function App() {
     }
   };
 
+  // Mobile: render dedicated iPhone layout
+  if (isMobile) {
+    return (
+      <MobileApp
+        multiLoanData={multiLoanData}
+        loanData={loanData}
+        isLoading={isLoading}
+        error={error}
+        resetKey={resetKey}
+        onCalculate={handleCalculate}
+        onReset={handleReset}
+      />
+    );
+  }
+
   return (
     <div className="app">
       <header>
@@ -173,7 +201,7 @@ function App() {
             {loanData && (
               <>
                 {/* Mobile-only results tab bar */}
-                <div className="mobile-results-tabs">
+                <div className="mobile-results-tabs" ref={resultsTabRef}>
                   <button
                     className={`mobile-results-tab ${mobileResultsTab === 'overview' ? 'active' : ''}`}
                     onClick={() => { setMobileResultsTab('overview'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}

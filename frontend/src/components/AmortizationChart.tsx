@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import {
   ComposedChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -25,15 +26,10 @@ interface AmortizationChartProps {
   onViewModeChange: (mode: 'combined' | 'per-loan') => void;
 }
 
-interface ChartDataPoint {
+interface SimpleChartPoint {
   month: number;
   balance: number;
-  green: number | null;
-  red: number | null;
-  eventMonth: number;
-  pointType: 'principal' | 'after_interest' | 'after_payment';
   cumulativeInterest: number;
-  cumulativePrincipalPaid: number;
   payoffPercent: number;
 }
 
@@ -45,7 +41,15 @@ interface Milestone {
 
 export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, multiLoanData, viewMode, onViewModeChange }) => {
   const { theme } = useTheme();
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 480;
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= 768
+  );
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const totalMonths = data.totalMonths;
   const hasMultipleLoans = !!multiLoanData && multiLoanData.loans.length > 1;
 
@@ -120,51 +124,21 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
     return result;
   }, [data]);
 
-  const chartData = useMemo(() => {
-    const points: ChartDataPoint[] = [];
-    let cumulativeInterest = 0;
-    let cumulativePrincipalPaid = 0;
-    if (data.events.length > 0) {
-      points.push({
-        month: 0, balance: data.events[0].startBalance,
-        green: null, red: data.events[0].startBalance, eventMonth: 0,
-        pointType: 'principal', cumulativeInterest: 0, cumulativePrincipalPaid: 0, payoffPercent: 0,
-      });
-    }
-    data.events.forEach((event) => {
-      const balanceAfterInterest = event.startBalance + event.interest;
-      const monthPosition = event.month - 1;
-      cumulativeInterest += event.interest;
-      cumulativePrincipalPaid += event.principalPaid ?? Math.max(0, event.payment - event.interest);
+  const simpleChartData = useMemo((): SimpleChartPoint[] => {
+    const points: SimpleChartPoint[] = [{ month: 0, balance: data.principal, cumulativeInterest: 0, payoffPercent: 0 }];
+    let cumInterest = 0;
+    for (const event of data.events) {
+      cumInterest += event.interest;
       const payoffPercent = ((data.principal - event.endBalance) / data.principal) * 100;
-      points.push({
-        month: monthPosition + 0.5, balance: balanceAfterInterest,
-        green: balanceAfterInterest, red: balanceAfterInterest, eventMonth: event.month,
-        pointType: 'after_interest', cumulativeInterest, cumulativePrincipalPaid, payoffPercent,
-      });
-      points.push({
-        month: monthPosition + 0.501, balance: balanceAfterInterest,
-        green: balanceAfterInterest, red: null, eventMonth: event.month,
-        pointType: 'after_interest', cumulativeInterest, cumulativePrincipalPaid, payoffPercent,
-      });
-      points.push({
-        month: event.month, balance: event.endBalance,
-        green: event.endBalance, red: event.endBalance, eventMonth: event.month,
-        pointType: 'after_payment', cumulativeInterest, cumulativePrincipalPaid, payoffPercent,
-      });
-      points.push({
-        month: event.month + 0.001, balance: event.endBalance,
-        green: null, red: event.endBalance, eventMonth: event.month,
-        pointType: 'after_payment', cumulativeInterest, cumulativePrincipalPaid, payoffPercent,
-      });
-    });
+      points.push({ month: event.month, balance: Math.max(0, event.endBalance), cumulativeInterest: cumInterest, payoffPercent });
+    }
     return points;
   }, [data]);
 
-  const displayedChartData = useMemo(() => {
-    if (!isSimulating && animationMonth >= totalMonths) return chartData;
-    return chartData.filter((point) => point.month <= animationMonth);
-  }, [chartData, animationMonth, isSimulating, totalMonths]);
+  const displayedSimpleData = useMemo(() => {
+    if (!isSimulating && animationMonth >= totalMonths) return simpleChartData;
+    return simpleChartData.filter(p => p.month <= animationMonth);
+  }, [simpleChartData, animationMonth, isSimulating, totalMonths]);
 
   const displayedMilestones = useMemo(() => {
     if (!isSimulating && animationMonth >= totalMonths) return milestones;
@@ -217,55 +191,37 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
   // ── TOOLTIPS ────────────────────────────────────────────────
   interface CombinedTooltipProps {
     active?: boolean;
-    payload?: Array<{ payload: ChartDataPoint }>;
+    payload?: Array<{ payload: SimpleChartPoint }>;
+    label?: number;
   }
 
-  const CombinedTooltip: React.FC<CombinedTooltipProps> = ({ active, payload }) => {
+  const CombinedTooltip: React.FC<CombinedTooltipProps> = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
-    const point = payload[0].payload;
-    if (point.pointType === 'principal') {
-      return (
-        <div className="custom-tooltip">
-          <p><strong>Month 0</strong></p>
-          <p style={{ fontSize: '1.1rem', fontWeight: 700, color: colors.accent }}>
-            Balance: {formatCurrencyFull(point.balance)}
-          </p>
-          <p style={{ fontSize: '0.85rem' }}>Starting Principal</p>
-          <hr />
-          <p style={{ color: colors.accent, fontWeight: 600 }}>Paid Off: 0%</p>
-        </div>
-      );
-    }
-    const event = data.events.find(e => e.month === point.eventMonth);
-    if (!event) return null;
-    const balanceAfterInterest = event.startBalance + event.interest;
-    const isAfterInterest = point.pointType === 'after_interest';
-    const principalPaid = event.principalPaid ?? Math.max(0, event.payment - event.interest);
+    const pt = payload[0].payload;
+    const mo = Number(label ?? pt.month);
+    const yr = mo / 12;
+    const timeStr = mo === 0 ? 'Start' : yr < 1 ? `Month ${mo}` : `Month ${mo} · ${yr.toFixed(1)}yr`;
+    const glassBg = theme === 'dark' ? 'rgba(28,25,23,0.92)' : 'rgba(255,255,255,0.95)';
+    const glassBorder = theme === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
     return (
-      <div className="custom-tooltip">
-        <p><strong>Month {event.month}</strong></p>
-        <p style={{ fontSize: '1.1rem', fontWeight: 700, color: isAfterInterest ? colors.interest : colors.payment }}>
-          Balance: {formatCurrencyFull(point.balance)}
-        </p>
-        <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-          {isAfterInterest ? 'After Interest' : 'After Payment'}
-        </p>
-        <hr />
-        <p>Start: {formatCurrencyFull(event.startBalance)}</p>
-        <p style={{ color: colors.interest }}>+ Interest: {formatCurrencyFull(event.interest)}</p>
-        <p style={{ color: colors.interest }}>= {formatCurrencyFull(balanceAfterInterest)}</p>
-        <p style={{ color: colors.payment }}>- Payment: {formatCurrencyFull(event.payment)}</p>
-        <p><strong>End: {formatCurrencyFull(event.endBalance)}</strong></p>
-        <hr />
-        <p style={{ color: colors.accent, fontWeight: 600 }}>
-          Principal Paid: {formatCurrencyFull(principalPaid)}
-        </p>
-        <p style={{ color: colors.accent, fontWeight: 600, marginTop: '0.5rem' }}>
-          Paid Off: {point.payoffPercent.toFixed(1)}%
+      <div style={{
+        background: glassBg,
+        backdropFilter: 'blur(16px)',
+        border: `1px solid ${glassBorder}`,
+        borderRadius: 12,
+        padding: '10px 14px',
+        fontSize: '0.8rem',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+        minWidth: 160,
+      }}>
+        <p style={{ fontWeight: 600, color: colors.text, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 6 }}>{timeStr}</p>
+        <p style={{ color: colors.accent, fontWeight: 700, fontSize: '1rem', marginBottom: 4 }}>{formatCurrencyFull(pt.balance)}</p>
+        <p style={{ color: colors.text, marginBottom: showCumulativeInterest ? 4 : 0 }}>
+          Paid off: <span style={{ color: colors.payment, fontWeight: 600 }}>{pt.payoffPercent.toFixed(1)}%</span>
         </p>
         {showCumulativeInterest && (
-          <p style={{ color: colors.cumulative, marginTop: '0.5rem' }}>
-            Total Interest Paid: {formatCurrencyFull(point.cumulativeInterest)}
+          <p style={{ color: colors.cumulative, fontWeight: 600 }}>
+            Interest paid: {formatCurrencyFull(pt.cumulativeInterest)}
           </p>
         )}
       </div>
@@ -306,19 +262,16 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
   };
 
   // ── AXIS + ZOOM ─────────────────────────────────────────────
-  const visibleEvents = data.events.filter(e => e.month >= windowStart && e.month <= windowEnd + 1);
-  const eventsForCalc = visibleEvents.length > 0 ? visibleEvents : data.events;
-  const maxBalance = Math.max(...eventsForCalc.map(e => e.startBalance + e.interest));
-  const minBalance = Math.min(...eventsForCalc.map(e => e.endBalance));
+  const visiblePts = simpleChartData.filter(p => p.month >= windowStart && p.month <= windowEnd);
+  const ptsForCalc = visiblePts.length > 0 ? visiblePts : simpleChartData;
+  const maxBalance = Math.max(...ptsForCalc.map(p => p.balance), 1);
+  const minBalance = Math.min(...ptsForCalc.map(p => p.balance), 0);
   const dataRange = maxBalance - minBalance;
-  const padding = dataRange * 0.2;
-  let yMin = minBalance - padding;
-  let yMax = maxBalance + padding;
-  if (yMin < 0) yMin = 0;
   const step = Math.pow(10, Math.floor(Math.log10(dataRange / 4 || 1)));
-  yMin = Math.floor(yMin / step) * step;
-  yMax = Math.ceil(yMax / step) * step;
-  const yBounds = { min: yMin, max: yMax };
+  const yBounds = {
+    min: Math.max(0, Math.floor((minBalance - dataRange * 0.05) / step) * step),
+    max: Math.ceil((maxBalance + dataRange * 0.05) / step) * step,
+  };
 
   const xTicks: number[] = [];
   const tickStep = windowSize <= 12 ? 1 : windowSize <= 24 ? 2 : windowSize <= 48 ? 6 : 12;
@@ -331,22 +284,6 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
   const canPanLeft = windowStart > 0;
   const canPanRight = windowStart + windowSize < totalMonths;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderDot = (props: any): React.ReactElement<SVGElement> => {
-    const { cx, cy, payload } = props;
-    if (cx == null || cy == null || !payload) return <g />;
-    const monthDecimal = payload.month % 1;
-    const isMainPoint = monthDecimal === 0 || monthDecimal === 0.5;
-    if (!isMainPoint) return <g />;
-    let fill = colors.accent;
-    if (payload.pointType === 'after_interest') fill = colors.interest;
-    else if (payload.pointType === 'after_payment') fill = colors.payment;
-    return (
-      <circle key={`dot-${payload.month}`} cx={cx} cy={cy} r={6}
-        fill={fill} stroke={colors.tooltipBg} strokeWidth={2} style={{ cursor: 'pointer' }} />
-    );
-  };
-
   // ── SHARED AXIS PROPS ───────────────────────────────────────
   const sharedXAxis = (
     <XAxis
@@ -354,8 +291,8 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
       domain={[windowStart, windowEnd]}
       ticks={xTicks}
       tickFormatter={(v) => `${Math.round(v)}`}
-      axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
-      tickLine={{ stroke: colors.axis }}
+      axisLine={false}
+      tickLine={false}
       tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
       label={isMobile ? undefined : { value: 'Month', position: 'bottom', offset: 10, fill: colors.text, fontSize: 14 }}
       allowDataOverflow
@@ -366,8 +303,8 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
     <YAxis
       domain={domain}
       tickFormatter={isMobile ? formatCurrencyMobile : formatCurrency}
-      axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
-      tickLine={{ stroke: colors.axis }}
+      axisLine={false}
+      tickLine={false}
       tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
       label={isMobile ? undefined : { value: 'Balance', angle: -90, position: 'insideLeft', offset: -45, fill: colors.text, fontSize: 14 }}
       width={isMobile ? 48 : 80}
@@ -398,28 +335,30 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
           )}
         </div>
         <div className="chart-controls">
-          <div className="window-control">
-            <button onClick={panLeft} disabled={!canPanLeft} title="Pan Left">&larr;</button>
-            <div className="window-slider">
-              <input
-                type="range"
-                min={Math.min(6, totalMonths)}
-                max={totalMonths}
-                step={1}
-                value={windowSize}
-                onChange={e => {
-                  const newSize = Number(e.target.value);
-                  setWindowSize(newSize);
-                  setWindowStart(prev => Math.max(0, Math.min(totalMonths - newSize, prev)));
-                }}
-                title={windowSize >= totalMonths ? 'Showing all months' : `Showing ${windowSize} months`}
-              />
-              <span className="window-label">
-                {windowSize >= totalMonths ? 'All months' : `${windowSize}mo · ${Math.floor(windowStart) + 1}–${Math.floor(windowEnd)}`}
-              </span>
+          {!isMobile && (
+            <div className="window-control">
+              <button onClick={panLeft} disabled={!canPanLeft} title="Pan Left">&larr;</button>
+              <div className="window-slider">
+                <input
+                  type="range"
+                  min={Math.min(6, totalMonths)}
+                  max={totalMonths}
+                  step={1}
+                  value={windowSize}
+                  onChange={e => {
+                    const newSize = Number(e.target.value);
+                    setWindowSize(newSize);
+                    setWindowStart(prev => Math.max(0, Math.min(totalMonths - newSize, prev)));
+                  }}
+                  title={windowSize >= totalMonths ? 'Showing all months' : `Showing ${windowSize} months`}
+                />
+                <span className="window-label">
+                  {windowSize >= totalMonths ? 'All months' : `${windowSize}mo · ${Math.floor(windowStart) + 1}–${Math.floor(windowEnd)}`}
+                </span>
+              </div>
+              <button onClick={panRight} disabled={!canPanRight} title="Pan Right">&rarr;</button>
             </div>
-            <button onClick={panRight} disabled={!canPanRight} title="Pan Right">&rarr;</button>
-          </div>
+          )}
 
           {viewMode === 'combined' && (
             <label className="toggle-option">
@@ -436,10 +375,12 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
             </button>
           )}
 
-          <button className="fullscreen-btn" onClick={() => setIsFullscreen(!isFullscreen)}
-            title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Fullscreen'}>
-            {isFullscreen ? '✕' : '⛶'}
-          </button>
+          {!isMobile && (
+            <button className="fullscreen-btn" onClick={() => setIsFullscreen(!isFullscreen)}
+              title={isFullscreen ? 'Exit Fullscreen (Esc)' : 'Fullscreen'}>
+              {isFullscreen ? '✕' : '⛶'}
+            </button>
+          )}
         </div>
       </div>
 
@@ -459,12 +400,8 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
       {viewMode === 'combined' && (
         <div className="chart-legend">
           <div className="legend-item">
-            <span className="legend-line green"></span>
-            <span>Payment Applied (Down)</span>
-          </div>
-          <div className="legend-item">
-            <span className="legend-line red"></span>
-            <span>Interest Accrued (Up)</span>
+            <span className="legend-line" style={{ background: colors.accent, opacity: 0.9 }}></span>
+            <span>Balance</span>
           </div>
           {showCumulativeInterest && (
             <div className="legend-item">
@@ -479,18 +416,19 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
         </div>
       )}
 
-      {/* ── PER-LOAN LEGEND ── */}
+      {/* ── PER-LOAN LEGEND ── compact scrollable pills */}
       {viewMode === 'per-loan' && multiLoanData && (
-        <div className="chart-legend per-loan-legend">
-          {multiLoanData.loans.map((loan, i) => (
-            <div key={loan.loanId} className="legend-item">
-              <span className="legend-dot" style={{ background: LOAN_COLORS[i % LOAN_COLORS.length] }}></span>
-              <span>{loan.loanName}</span>
-              <span className="legend-payoff" style={{ color: LOAN_COLORS[i % LOAN_COLORS.length] }}>
-                {loan.totalMonths}mo
-              </span>
-            </div>
-          ))}
+        <div className="chart-legend-pills">
+          {multiLoanData.loans.map((loan, i) => {
+            const color = LOAN_COLORS[i % LOAN_COLORS.length];
+            return (
+              <div key={loan.loanId} className="legend-pill" style={{ '--pill-color': color } as React.CSSProperties}>
+                <span className="legend-pill-dot" />
+                <span className="legend-pill-name">{loan.loanName}</span>
+                <span className="legend-pill-dur">{loan.totalMonths}mo</span>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -500,21 +438,28 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
 
           {/* COMBINED CHART */}
           {viewMode === 'combined' ? (
-            <ComposedChart data={displayedChartData} margin={isMobile ? { top: 8, right: 8, left: 0, bottom: 16 } : { top: 20, right: 40, left: 0, bottom: 30 }}>
+            <ComposedChart data={displayedSimpleData} margin={isMobile ? { top: 8, right: 8, left: 0, bottom: 16 } : { top: 20, right: 40, left: 0, bottom: 30 }}>
+              <defs>
+                <linearGradient id="combinedBalGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%"   stopColor={colors.accent} stopOpacity={0.38} />
+                  <stop offset="45%"  stopColor={colors.accent} stopOpacity={0.12} />
+                  <stop offset="100%" stopColor={colors.accent} stopOpacity={0.01} />
+                </linearGradient>
+              </defs>
               {sharedXAxis}
               {sharedYAxis([yBounds.min, yBounds.max])}
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} opacity={0.5} />
+              <CartesianGrid strokeDasharray="2 6" stroke={colors.grid} opacity={0.4} vertical={false} />
               <Tooltip content={<CombinedTooltip />} />
-              <Line type="linear" dataKey="green" stroke={colors.payment} strokeWidth={3}
-                dot={renderDot} activeDot={{ r: 8, stroke: colors.tooltipBg, strokeWidth: 2 }}
-                name="Payment" connectNulls={false} isAnimationActive={false} />
-              <Line type="linear" dataKey="red" stroke={colors.interest} strokeWidth={3}
-                dot={false} activeDot={{ r: 8, fill: colors.interest, stroke: colors.tooltipBg, strokeWidth: 2 }}
-                name="Interest" connectNulls={false} isAnimationActive={false} />
+              <Area type="monotone" dataKey="balance" name="Balance"
+                stroke={colors.accent} strokeWidth={2.5}
+                fill="url(#combinedBalGrad)"
+                dot={false} activeDot={{ r: 6, fill: colors.accent, stroke: colors.tooltipBg, strokeWidth: 2 }}
+                isAnimationActive={false} />
               {showCumulativeInterest && (
                 <Line type="monotone" dataKey="cumulativeInterest" stroke={colors.cumulative}
-                  strokeWidth={3} dot={false} activeDot={{ r: 6, fill: colors.cumulative, stroke: colors.tooltipBg, strokeWidth: 2 }}
-                  name="Total Interest Paid" connectNulls isAnimationActive={false} />
+                  strokeWidth={2} strokeDasharray="4 3" dot={false}
+                  activeDot={{ r: 5, fill: colors.cumulative, stroke: colors.tooltipBg, strokeWidth: 2 }}
+                  name="Total Interest Paid" isAnimationActive={false} />
               )}
               {displayedMilestones.map((milestone) => {
                 const milestoneColors: Record<number, string> = {
@@ -532,20 +477,33 @@ export const AmortizationChart: React.FC<AmortizationChartProps> = ({ data, mult
           ) : (
             /* PER-LOAN CHART */
             <ComposedChart data={perLoanChartData} margin={isMobile ? { top: 8, right: 8, left: 0, bottom: 16 } : { top: 20, right: 40, left: 0, bottom: 30 }}>
+              <defs>
+                {multiLoanData?.loans.map((loan, i) => {
+                  const color = LOAN_COLORS[i % LOAN_COLORS.length];
+                  return (
+                    <linearGradient key={`plg-${loan.loanId}`} id={`plg-${loan.loanId}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={color} stopOpacity={0.30} />
+                      <stop offset="45%" stopColor={color} stopOpacity={0.09} />
+                      <stop offset="100%" stopColor={color} stopOpacity={0.01} />
+                    </linearGradient>
+                  );
+                })}
+              </defs>
               {sharedXAxis}
               {sharedYAxis([perLoanYBounds.min, perLoanYBounds.max])}
-              <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} opacity={0.5} />
+              <CartesianGrid strokeDasharray="2 6" stroke={colors.grid} opacity={0.4} />
               <Tooltip content={<PerLoanTooltip />} />
               {multiLoanData?.loans.map((loan, i) => (
-                <Line
+                <Area
                   key={loan.loanId}
                   type="monotone"
                   dataKey={loan.loanId}
                   name={loan.loanName}
                   stroke={LOAN_COLORS[i % LOAN_COLORS.length]}
-                  strokeWidth={3}
+                  fill={`url(#plg-${loan.loanId})`}
+                  strokeWidth={2.5}
                   dot={false}
-                  activeDot={{ r: 7, stroke: colors.tooltipBg, strokeWidth: 2 }}
+                  activeDot={{ r: 6, stroke: colors.tooltipBg, strokeWidth: 2 }}
                   isAnimationActive={false}
                   connectNulls
                 />

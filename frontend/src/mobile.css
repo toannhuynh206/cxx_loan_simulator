@@ -1,0 +1,1836 @@
+/* ================================================================
+   MOBILE.CSS — Dedicated iPhone layout styles
+   Only loaded by MobileApp.tsx. Zero impact on desktop.
+   ================================================================ */
+
+/* ── Root mobile wrapper ─────────────────────────────────────── */
+.m-app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--color-bg-primary);
+  font-family: var(--font-body);
+  color: var(--color-text-primary);
+}
+
+/* ── Compact header ──────────────────────────────────────────── */
+.m-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  height: 56px;
+  background: var(--color-bg-secondary);
+  border-bottom: 1px solid var(--color-border);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 300;
+  box-shadow: var(--shadow-sm);
+}
+
+.m-header-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.m-header-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.m-header-title {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.m-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  padding-right: var(--space-1);
+}
+
+/* ── Mobile segmented theme toggle ──────────────────────────── */
+.m-theme-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-tertiary);
+  border: 1.5px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color var(--transition-fast);
+}
+
+.m-theme-toggle:active {
+  border-color: var(--color-border-strong);
+}
+
+.m-theme-seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  color: var(--color-text-tertiary);
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.m-theme-seg svg {
+  width: 16px;
+  height: 16px;
+}
+
+.m-theme-seg.active {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12), 0 0 0 1px var(--color-border-subtle);
+}
+
+[data-theme="dark"] .m-theme-seg.active {
+  background: var(--color-bg-primary);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), 0 0 0 1px var(--color-border);
+}
+
+.m-header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.m-header-icon-btn:active {
+  background: var(--color-bg-hover);
+}
+
+.m-header-icon-btn.active {
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+}
+
+/* ── Main scroll area ────────────────────────────────────────── */
+.m-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-4);
+  padding-top: calc(56px + var(--space-4)); /* offset fixed header */
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 16px)); /* always clear fixed bottom nav */
+}
+
+/* ── Collapsed input pill ────────────────────────────────────── */
+.m-input-pill {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  gap: var(--space-3);
+}
+
+.m-input-pill:active {
+  background: var(--color-bg-hover);
+}
+
+.m-pill-summary {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-pill-edit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+/* ── Section title (centered) ────────────────────────────────── */
+.m-section-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 var(--space-5) 0;
+  color: var(--color-text-primary);
+}
+
+/* ── Stat card grid (2×3) ────────────────────────────────────── */
+.m-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.m-stat-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.m-stat-card.accent {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+}
+
+.m-stat-card.warning {
+  background: var(--color-error-subtle);
+  border-color: var(--color-error);
+}
+
+.m-stat-label {
+  font-size: 0.5625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.m-stat-value {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.m-stat-card.accent .m-stat-value {
+  color: var(--color-accent);
+}
+
+.m-stat-card.warning .m-stat-value {
+  color: var(--color-error);
+}
+
+.m-stat-sub {
+  font-size: 0.625rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.3;
+}
+
+/* ── Chart tab wrapper ───────────────────────────────────────── */
+.m-chart-section {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+.m-chart-wrapper {
+  width: 100%;
+  height: calc(100dvh - 280px);
+  min-height: 340px;
+}
+
+/* ── Schedule table ──────────────────────────────────────────── */
+.m-schedule {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.m-schedule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.m-schedule-loan-name {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.m-schedule-meta {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.m-schedule-meta span {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.m-schedule-meta span.accent {
+  color: var(--color-accent);
+}
+
+.m-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.m-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.m-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--color-bg-tertiary);
+}
+
+.m-table thead th {
+  padding: var(--space-3) var(--space-3);
+  text-align: center;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.m-table tbody tr {
+  border-bottom: 1px solid var(--color-border-subtle);
+  transition: background var(--transition-fast);
+}
+
+.m-table tbody tr.even {
+  background: var(--color-bg-tertiary);
+}
+
+.m-table tbody tr:active {
+  background: var(--color-bg-hover);
+}
+
+.m-table td {
+  padding: 0 var(--space-3);
+  height: 44px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.m-td-month {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+  width: 36px;
+}
+
+.m-td-balance {
+  text-align: right;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+}
+
+.m-td-payment {
+  text-align: right;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+.m-td-interest {
+  text-align: right;
+  color: var(--color-error);
+  font-weight: 500;
+  opacity: 0.9;
+}
+
+/* milestone row highlight */
+.m-table tbody tr.milestone {
+  background: var(--color-accent-subtle) !important;
+}
+
+.m-table tbody tr.milestone td {
+  color: var(--color-accent);
+}
+
+/* ── Pagination ──────────────────────────────────────────────── */
+.m-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.m-pagination-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.m-pagination-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.m-pagination-btn:not(:disabled):active {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.m-pagination-info {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
+/* ── Error message ───────────────────────────────────────────── */
+.m-error {
+  background: var(--color-error-subtle);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  color: var(--color-error);
+  font-size: 0.9375rem;
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+
+/* ── How It Works full-screen wrapper ───────────────────────── */
+.m-hiw-wrapper {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── PaymentBreakdownChart centered wrapper ──────────────────── */
+.m-breakdown-wrapper {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── More tab (scenarios + strategy) ────────────────────────── */
+.m-more-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.m-section-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ── Reset pill (floating above nav) ─────────────────────────── */
+.m-reset-pill {
+  position: fixed;
+  bottom: calc(72px + env(safe-area-inset-bottom) + 10px);
+  right: 16px;
+  z-index: 210;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-tertiary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.12);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.m-reset-pill:hover,
+.m-reset-pill:active {
+  color: var(--color-error);
+  border-color: var(--color-error);
+  background: var(--color-error-subtle);
+}
+
+/* ── iOS bottom navigation bar ───────────────────────────────── */
+.m-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 72px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--color-bg-secondary);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  z-index: 200;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
+}
+
+.m-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: color var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m-bottom-nav-item.active {
+  color: var(--color-accent);
+}
+
+.m-bottom-nav-item.disabled {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.m-bottom-nav-item svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.75;
+  transition: transform var(--transition-fast);
+}
+
+.m-bottom-nav-item.active svg {
+  transform: scale(1.1);
+}
+
+.m-bottom-nav-label {
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+/* ── Tab content fade-in ─────────────────────────────────────── */
+@keyframes mTabFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.m-tab-content {
+  animation: mTabFadeIn 0.2s ease both;
+}
+
+/* ── Loan selector tabs (multi-loan schedule) ────────────────── */
+.m-loan-tabs {
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  margin-bottom: var(--space-3);
+  padding-bottom: 2px;
+}
+
+.m-loan-tabs::-webkit-scrollbar { display: none; }
+
+.m-loan-tab {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+}
+
+.m-loan-tab.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ── Mobile Balance View (stacked cards) ─────────────────── */
+.m-balance-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.m-balance-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  padding-bottom: var(--space-3);
+}
+
+.m-balance-card-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-4) var(--space-2);
+}
+
+.m-balance-card-title {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.m-balance-card-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  font-weight: 500;
+}
+
+/* Pill legend for multi-loan */
+.m-balance-legend {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 0 var(--space-4) var(--space-3);
+  scrollbar-width: none;
+}
+.m-balance-legend::-webkit-scrollbar { display: none; }
+
+.m-balance-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  padding: 3px 9px 3px 7px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+  color: var(--color-text-primary);
+}
+
+.m-balance-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pill-color);
+  flex-shrink: 0;
+}
+
+.m-balance-pill-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-balance-pill-dur {
+  font-size: 0.6875rem;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+/* Crossover callout note */
+.m-balance-crossover-note {
+  margin: 2px var(--space-4) var(--space-3);
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(217,119,6,0.08);
+  border: 1px solid rgba(217,119,6,0.22);
+  font-size: 0.7rem;
+  color: #b45309;
+  line-height: 1.4;
+}
+[data-theme="dark"] .m-balance-crossover-note {
+  background: rgba(251,191,36,0.06);
+  border-color: rgba(251,191,36,0.18);
+  color: #fbbf24;
+}
+
+/* By Year table cells */
+.m-td-pct {
+  padding: 0 var(--space-3) 0 var(--space-2);
+  width: 100px;
+}
+
+.m-pct-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.m-pct-track {
+  flex: 1;
+  height: 5px;
+  background: var(--color-border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.m-pct-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.m-pct-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  min-width: 30px;
+  text-align: right;
+}
+
+/* ================================================================
+   MOBILE AMORTIZATION TABLE  (msat-*)
+   ================================================================ */
+
+.msat-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Header row ─────────────────────────────────────────────── */
+.msat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+/* ── Combined / Per-Loan toggle ─────────────────────────────── */
+.msat-toggle {
+  display: flex;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.msat-toggle-btn {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+}
+
+.msat-toggle-btn.active {
+  background: var(--color-bg-primary);
+  color: var(--color-accent);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+}
+
+/* ── Loan pill selector ─────────────────────────────────────── */
+.msat-loan-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 0 var(--space-3);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.msat-loan-pills::-webkit-scrollbar { display: none; }
+
+.msat-loan-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.msat-loan-pill.active {
+  border-color: var(--msat-pill-color);
+  color: var(--msat-pill-color);
+  background: color-mix(in srgb, var(--msat-pill-color) 10%, var(--color-bg-secondary));
+}
+
+.msat-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--msat-pill-color);
+  flex-shrink: 0;
+}
+
+.msat-pill-name {
+  font-weight: 600;
+}
+
+/* ── Info strip ─────────────────────────────────────────────── */
+.msat-info-strip {
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  overflow-x: auto;
+  scrollbar-width: none;
+  gap: 0;
+}
+.msat-info-strip::-webkit-scrollbar { display: none; }
+
+.msat-info-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  flex: 1;
+  min-width: 60px;
+  text-align: center;
+}
+
+.msat-info-lbl {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.msat-info-val {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.msat-info-div {
+  width: 1px;
+  height: 28px;
+  background: var(--color-border);
+  flex-shrink: 0;
+  margin: 0 var(--space-2);
+}
+
+/* ── Table wrapper ──────────────────────────────────────────── */
+.msat-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+  margin-bottom: var(--space-2);
+  /* fade right edge to hint scroll */
+  background: var(--color-bg-secondary);
+}
+
+.msat-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  min-width: 520px; /* force scroll on narrow screens */
+}
+
+/* ── Column widths ──────────────────────────────────────────── */
+.msat-col-mo    { width: 72px; }
+.msat-col-start { width: 84px; }
+.msat-col-pmt   { width: 84px; }
+.msat-col-int   { width: 76px; }
+.msat-col-net   { width: 80px; }
+.msat-col-end   { width: 84px; }
+
+/* ── Table header ───────────────────────────────────────────── */
+.msat-th {
+  padding: 8px 8px;
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  text-align: right;
+  background: var(--color-bg-tertiary);
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.msat-col-mo.msat-th {
+  text-align: left;
+  padding-left: 12px;
+  position: sticky;
+  left: 0;
+  z-index: 3; /* above both sticky top and scrollable */
+}
+
+/* ── Sticky first column ────────────────────────────────────── */
+.msat-sticky-col {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-bg-secondary);
+}
+
+.msat-alt .msat-sticky-col {
+  background: var(--color-bg-tertiary);
+}
+
+.msat-sticky-col::after {
+  content: '';
+  position: absolute;
+  top: 0; right: -6px; bottom: 0;
+  width: 6px;
+  background: linear-gradient(to right, rgba(0,0,0,0.06), transparent);
+  pointer-events: none;
+}
+
+/* ── Table rows ─────────────────────────────────────────────── */
+.msat-tr {
+  transition: background 0.1s;
+}
+
+.msat-alt {
+  background: var(--color-bg-tertiary);
+}
+
+.msat-final {
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-bg-secondary)) !important;
+}
+
+/* ── Table cells ────────────────────────────────────────────── */
+.msat-td {
+  padding: 0 8px;
+  height: 44px;
+  font-size: 0.78rem;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.msat-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.msat-balance {
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.msat-zero {
+  font-weight: 700;
+}
+
+/* ── Month cell internals ───────────────────────────────────── */
+.msat-month-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 8px 10px 12px;
+  height: 44px;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.msat-month-accent {
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+}
+
+.msat-month-num {
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  line-height: 1;
+}
+
+.msat-ms-badge {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 5px;
+  border-radius: 999px;
+  line-height: 1.4;
+}
+
+/* Payoff progress bar at bottom of month cell */
+.msat-progress-strip {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: var(--bar-w);
+  background: var(--bar-c);
+  opacity: 0.45;
+  border-radius: 0 1px 1px 0;
+}
+
+/* ── Column legend ──────────────────────────────────────────── */
+.msat-col-legend {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding: var(--space-2) 0;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--color-text-tertiary);
+  opacity: 0.8;
+}
+
+/* ── Pagination ─────────────────────────────────────────────── */
+.msat-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.msat-pg-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, opacity 0.12s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msat-pg-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.msat-pg-btn:not(:disabled):active {
+  background: var(--color-bg-tertiary);
+}
+
+.msat-pg-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.msat-pg-num {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.msat-pg-total {
+  font-weight: 400;
+  color: var(--color-text-tertiary);
+}
+
+.msat-pg-range {
+  font-size: 0.65rem;
+  color: var(--color-text-tertiary);
+  letter-spacing: 0.02em;
+}
+
+/* ── Summary footer ─────────────────────────────────────────── */
+.msat-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-top: var(--space-2);
+  background: var(--color-border); /* gap color via bg */
+}
+
+.msat-sum-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-secondary);
+}
+
+.msat-sum-lbl {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.msat-sum-val {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ================================================================
+   MOBILE SIMULATE TAB  (msim-*)
+   ================================================================ */
+
+.msim-root {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+/* ── Generic section wrapper ────────────────────────────────── */
+.msim-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.msim-section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.msim-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-primary);
+}
+
+.msim-section-sub {
+  font-size: 0.7rem;
+  color: var(--color-text-tertiary);
+}
+
+/* ── Column headers ─────────────────────────────────────────── */
+.msim-col-headers {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 14px 4px;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-text-tertiary);
+}
+
+.msim-col-headers > span:first-child { text-align: left; }
+.msim-col-headers > span:not(:first-child) { text-align: right; }
+
+.msim-col-headers-goal {
+  display: grid;
+  grid-template-columns: 52px 1fr auto auto;
+  padding: 0 0 4px;
+  gap: var(--space-2);
+}
+
+.msim-col-headers-goal > span { text-align: left; }
+.msim-col-headers-goal > span:nth-child(3),
+.msim-col-headers-goal > span:nth-child(4) { text-align: right; }
+
+/* ── Inline value labels ────────────────────────────────────── */
+.msim-val-label {
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+  line-height: 1;
+}
+
+/* ── Scenario nav ───────────────────────────────────────────── */
+.msim-scenario-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.msim-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, opacity 0.12s;
+  min-height: 36px;
+}
+
+.msim-nav-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.msim-nav-btn:not(:disabled):active {
+  background: var(--color-bg-tertiary);
+}
+
+.msim-nav-hint {
+  font-size: 0.65rem;
+  color: var(--color-text-tertiary);
+  text-align: center;
+}
+
+/* ── Scenario rows ──────────────────────────────────────────── */
+.msim-scenario-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-border); /* gap fill */
+}
+
+.msim-scenario-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 12px 14px 18px 14px; /* bottom padding for bar */
+  background: var(--color-bg-secondary);
+  border-left: 3px solid transparent;
+  overflow: hidden;
+  min-height: 52px;
+}
+
+.msim-scenario-current {
+  background: var(--color-bg-tertiary);
+}
+
+.msim-scenario-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.msim-scenario-amount {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}
+
+.msim-scenario-mo {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  margin-left: 1px;
+}
+
+.msim-scenario-badge {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+.msim-badge-current {
+  background: var(--color-accent-subtle);
+  color: var(--color-accent);
+  border: 1px solid var(--color-accent-muted);
+}
+
+.msim-badge-min {
+  background: var(--color-warning-subtle, rgba(245,158,11,0.12));
+  color: #d97706;
+  border: 1px solid rgba(245,158,11,0.3);
+}
+
+.msim-scenario-right {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.msim-scenario-right-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+.msim-scenario-date {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.msim-scenario-interest {
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Relative interest bar at bottom of row */
+.msim-scenario-bar-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-bg-tertiary);
+}
+
+.msim-scenario-bar {
+  height: 100%;
+  border-radius: 0 2px 2px 0;
+  transition: width 0.3s ease;
+}
+
+.msim-scenario-legend {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--color-text-tertiary);
+  padding: 0 var(--space-1);
+  opacity: 0.7;
+}
+
+/* ── Goal timeline rows ─────────────────────────────────────── */
+.msim-goal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-border);
+}
+
+.msim-goal-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--color-bg-secondary);
+  min-height: 56px;
+  padding: 0;
+}
+
+.msim-goal-row:nth-child(even) {
+  background: var(--color-bg-tertiary);
+}
+
+.msim-goal-na {
+  opacity: 0.5;
+}
+
+.msim-goal-years {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  flex-shrink: 0;
+  padding: var(--space-3);
+  border-right: 1px solid var(--color-border-subtle);
+}
+
+.msim-goal-num {
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.msim-goal-label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+.msim-goal-divider {
+  width: 1px;
+  background: var(--color-border-subtle);
+  align-self: stretch;
+}
+
+.msim-goal-details {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-3);
+}
+
+.msim-goal-payment {
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.msim-goal-mo {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--color-text-tertiary);
+  margin-left: 1px;
+}
+
+.msim-goal-interest {
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.msim-goal-na-text {
+  font-size: 0.78rem;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+}
+
+.msim-goal-vs {
+  padding: var(--space-2) var(--space-3);
+  flex-shrink: 0;
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.msim-goal-delta-label {
+  font-size: 0.55rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  line-height: 1;
+}
+
+.msim-goal-delta {
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Extra payment ──────────────────────────────────────────── */
+.msim-extra-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.msim-extra-input-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-bg-tertiary);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-3);
+  height: 48px;
+}
+
+.msim-extra-prefix {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+}
+
+.msim-extra-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+  outline: none;
+  min-width: 0;
+}
+
+.msim-extra-clear {
+  border: none;
+  background: transparent;
+  color: var(--color-text-tertiary);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+.msim-quick-pills {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.msim-quick-pill {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  min-height: 34px;
+}
+
+.msim-quick-pill.active {
+  background: var(--color-accent-subtle);
+}
+
+.msim-extra-total {
+  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+/* ── Strategy cards ─────────────────────────────────────────── */
+.msim-strategy-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.msim-strategy-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: var(--space-3) var(--space-2);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
+  cursor: pointer;
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+  min-height: 140px;
+  justify-content: center;
+}
+
+.msim-strategy-card:active {
+  opacity: 0.8;
+}
+
+.msim-best-badge {
+  position: absolute;
+  top: -8px;
+  right: 6px;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.msim-strat-emoji {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.msim-strat-name {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.msim-strat-sub {
+  font-size: 0.6rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.2;
+}
+
+.msim-strat-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--color-border-subtle);
+  margin: 4px 0;
+}
+
+.msim-strat-interest {
+  font-size: 0.9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.msim-strat-label {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+
+.msim-strat-metric-label {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+  line-height: 1;
+}
+
+.msim-strat-time {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.msim-strat-saved {
+  font-size: 0.65rem;
+  font-weight: 700;
+}
+
+/* ── Chart wrapper ──────────────────────────────────────────── */
+.msim-chart-wrap {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-secondary);
+  padding: var(--space-3);
+}
+
+/* ── Payoff allocation ──────────────────────────────────────── */
+.msim-alloc-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.msim-alloc-row {
+  display: flex;
+  gap: var(--space-3);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  align-items: flex-start;
+}
+
+.msim-alloc-rank {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.msim-alloc-num {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.msim-alloc-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.msim-alloc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.msim-alloc-name {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  truncate: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.msim-alloc-pmt {
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.msim-alloc-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--color-text-tertiary);
+}
+
+.msim-alloc-bar-track {
+  height: 4px;
+  background: var(--color-bg-tertiary);
+  border-radius: 2px;
+  overflow: hidden;
+  margin: 2px 0;
+}
+
+.msim-alloc-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  opacity: 0.7;
+}
+
+.msim-alloc-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.68rem;
+  color: var(--color-text-tertiary);
+}
+
+.msim-alloc-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--color-border);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-top: var(--space-2);
+}
+
+.msim-alloc-sum-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: var(--space-3);
+  background: var(--color-bg-secondary);
+  text-align: center;
+}
+
+.msim-alloc-sum-label {
+  font-size: 0.58rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-text-tertiary);
+}
+
+.msim-alloc-sum-val {
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-primary);
+}

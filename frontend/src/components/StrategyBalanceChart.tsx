@@ -1,13 +1,12 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   ComposedChart,
-  Line,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  Legend,
   ReferenceLine
 } from 'recharts';
 import { StrategyResult } from '../types/payoffStrategy';
@@ -40,7 +39,14 @@ const LOAN_COLORS = [
 
 export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ result, selectedStrategy, originalLoans }) => {
   const { theme } = useTheme();
-  const isMobile = typeof window !== 'undefined' && window.innerWidth <= 480;
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= 768
+  );
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const formatCurrencyMobile = (value: number) => {
     if (value >= 1_000_000) return `$${(value / 1_000_000).toFixed(1)}M`;
     if (value >= 1_000) return `$${(value / 1_000).toFixed(0)}K`;
@@ -154,7 +160,20 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
       const totalBalance = sortedPayload.reduce((sum, entry) => sum + entry.value, 0);
 
       return (
-        <div className="strategy-chart-tooltip">
+        <div
+          className="strategy-chart-tooltip"
+          style={{
+            background: theme === 'dark' ? 'rgba(28,25,23,0.92)' : 'rgba(255,255,255,0.92)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: `1px solid ${theme === 'dark' ? 'rgba(68,64,60,0.8)' : 'rgba(231,229,228,0.9)'}`,
+            borderRadius: 12,
+            padding: '10px 14px',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)',
+            minWidth: 180,
+            fontSize: '0.8125rem',
+          }}
+        >
           <p className="tooltip-month"><strong>Month {label}</strong></p>
           <div className="tooltip-loans">
             {sortedPayload.map(entry => (
@@ -203,31 +222,71 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
             </span>
           )}
         </div>
-        <button
-          className="fullscreen-btn"
-          onClick={() => setIsFullscreen(!isFullscreen)}
-          title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen"}
-        >
-          {isFullscreen ? '✕' : '⛶'}
-        </button>
+        {!isMobile && (
+          <button
+            className="fullscreen-btn"
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen"}
+          >
+            {isFullscreen ? '✕' : '⛶'}
+          </button>
+        )}
       </div>
+
+      {/* Custom pill legend */}
+      <div className="strategy-chart-pills">
+        {loanNames.map((loan, index) => {
+          const color = LOAN_COLORS[index % LOAN_COLORS.length];
+          return (
+            <div
+              key={loan.id}
+              className={`strategy-chart-pill ${hoveredLoan === loan.name ? 'hovered' : ''}`}
+              style={{ '--pill-color': color } as React.CSSProperties}
+              onMouseEnter={() => setHoveredLoan(loan.name)}
+              onMouseLeave={() => setHoveredLoan(null)}
+            >
+              <span className="strategy-chart-pill-dot" />
+              <span>{loan.name}</span>
+            </div>
+          );
+        })}
+      </div>
+
       <div className="strategy-chart-wrapper">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
             margin={isMobile ? { top: 8, right: 8, left: 0, bottom: 16 } : { top: 20, right: 30, left: 0, bottom: 30 }}
           >
+            <defs>
+              {loanNames.map((loan, index) => {
+                const color = LOAN_COLORS[index % LOAN_COLORS.length];
+                return (
+                  <linearGradient
+                    key={loan.id}
+                    id={`stratGrad-${loan.id}`}
+                    x1="0" y1="0" x2="0" y2="1"
+                  >
+                    <stop offset="0%" stopColor={color} stopOpacity={0.32} />
+                    <stop offset="45%" stopColor={color} stopOpacity={0.10} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.01} />
+                  </linearGradient>
+                );
+              })}
+            </defs>
+
             <CartesianGrid
-              strokeDasharray="3 3"
+              strokeDasharray="2 6"
               stroke={colors.grid}
-              opacity={0.5}
+              opacity={0.4}
+              vertical={false}
             />
             <XAxis
               dataKey="month"
               type="number"
               domain={[0, result.totalMonths]}
-              axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
-              tickLine={{ stroke: colors.axis }}
+              axisLine={false}
+              tickLine={false}
               tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
               label={isMobile ? undefined : {
                 value: 'Month',
@@ -240,8 +299,8 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
             <YAxis
               domain={[0, yMax]}
               tickFormatter={isMobile ? formatCurrencyMobile : formatCurrency}
-              axisLine={{ stroke: colors.axis, strokeWidth: 1 }}
-              tickLine={{ stroke: colors.axis }}
+              axisLine={false}
+              tickLine={false}
               tick={{ fill: colors.text, fontSize: isMobile ? 10 : 12 }}
               label={isMobile ? undefined : {
                 value: 'Balance',
@@ -254,23 +313,19 @@ export const StrategyBalanceChart: React.FC<StrategyBalanceChartProps> = ({ resu
               width={isMobile ? 48 : 80}
             />
             <Tooltip content={<CustomTooltip />} />
-            <Legend
-              verticalAlign="top"
-              height={36}
-              onMouseEnter={(e) => setHoveredLoan(e.dataKey as string)}
-              onMouseLeave={() => setHoveredLoan(null)}
-            />
 
-            {/* Lines for each loan */}
+            {/* Area series for each loan */}
             {loanNames.map((loan, index) => (
-              <Line
+              <Area
                 key={loan.id}
                 type="monotone"
                 dataKey={loan.name}
                 stroke={LOAN_COLORS[index % LOAN_COLORS.length]}
-                strokeWidth={hoveredLoan === loan.name ? 4 : 2}
+                strokeWidth={hoveredLoan === loan.name ? 3 : 2}
+                fill={`url(#stratGrad-${loan.id})`}
+                fillOpacity={hoveredLoan && hoveredLoan !== loan.name ? 0.15 : 1}
                 dot={false}
-                activeDot={{ r: 6, strokeWidth: 2 }}
+                activeDot={{ r: 5, fill: LOAN_COLORS[index % LOAN_COLORS.length], strokeWidth: 0 }}
                 opacity={hoveredLoan && hoveredLoan !== loan.name ? 0.3 : 1}
                 isAnimationActive={false}
               />

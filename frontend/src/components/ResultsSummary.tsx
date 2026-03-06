@@ -41,10 +41,11 @@ export const ResultsSummary: React.FC<ResultsSummaryProps> = ({ data }) => {
         <div className="summary-item highlight">
           <span className="label">Time to Payoff</span>
           <span className="value">
-            {yearsToPayoff > 0 && `${yearsToPayoff} year${yearsToPayoff > 1 ? 's' : ''} `}
-            {remainingMonths} month{remainingMonths !== 1 ? 's' : ''}
-            <span className="sub"> ({data.totalMonths} total)</span>
+            {yearsToPayoff > 0 && `${yearsToPayoff}yr `}
+            {remainingMonths > 0 && `${remainingMonths}mo`}
+            {yearsToPayoff === 0 && remainingMonths === 0 && '—'}
           </span>
+          <span className="sub">{data.totalMonths} months total</span>
         </div>
 
         <div className="summary-item highlight warning">

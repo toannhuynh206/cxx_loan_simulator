@@ -1,5 +1,5 @@
-import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import React, { useState } from 'react';
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import { LoanResponse } from '../types/loan';
 import { useTheme } from '../context/ThemeContext';
 
@@ -9,6 +9,7 @@ interface PaymentBreakdownChartProps {
 
 export const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ data }) => {
   const { theme } = useTheme();
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const totalPaid = data.principal + data.totalInterest;
 
   // Theme-aware colors
@@ -41,22 +42,6 @@ export const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ da
     }).format(value);
   };
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { color: string } }> }) => {
-    if (active && payload && payload.length) {
-      const item = payload[0];
-      const percent = ((item.value / totalPaid) * 100).toFixed(1);
-      return (
-        <div className="pie-tooltip">
-          <p style={{ color: item.payload.color, fontWeight: 600 }}>{item.name}</p>
-          <p>{formatCurrency(item.value)}</p>
-          <p>{percent}% of total</p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   // Custom label inside pie
   const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: {
     cx: number;
@@ -71,7 +56,7 @@ export const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ da
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-    if (percent < 0.05) return null; // Don't show label if slice is too small
+    if (percent < 0.05) return null;
 
     return (
       <text
@@ -94,31 +79,92 @@ export const PaymentBreakdownChart: React.FC<PaymentBreakdownChartProps> = ({ da
 
       <div className="breakdown-content">
         <div className="breakdown-chart">
-          <ResponsiveContainer width="100%" height={250}>
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={2}
-                dataKey="value"
-                labelLine={false}
-                label={renderCustomLabel}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip content={<CustomTooltip />} />
-              <Legend
-                verticalAlign="bottom"
-                height={36}
-                formatter={(value) => <span style={{ color: colors.textSecondary }}>{value}</span>}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          {/* Wrap in relative container for center overlay */}
+          <div style={{ position: 'relative' }}>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <defs>
+                  <linearGradient id="principalGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={colors.principal} stopOpacity={1} />
+                    <stop offset="100%" stopColor={theme === 'dark' ? '#059669' : '#047857'} stopOpacity={0.85} />
+                  </linearGradient>
+                  <linearGradient id="interestGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={colors.interest} stopOpacity={1} />
+                    <stop offset="100%" stopColor={theme === 'dark' ? '#dc2626' : '#991b1b'} stopOpacity={0.85} />
+                  </linearGradient>
+                </defs>
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={65}
+                  outerRadius={105}
+                  paddingAngle={3}
+                  cornerRadius={4}
+                  dataKey="value"
+                  labelLine={false}
+                  label={renderCustomLabel}
+                  activeIndex={activeIndex ?? undefined}
+                  onMouseEnter={(_, index) => setActiveIndex(index)}
+                  onMouseLeave={() => setActiveIndex(null)}
+                  onClick={(_, index) => setActiveIndex(activeIndex === index ? null : index)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Cell
+                    key="cell-principal"
+                    fill="url(#principalGrad)"
+                    stroke={theme === 'dark' ? '#1c1917' : '#ffffff'}
+                    strokeWidth={2}
+                  />
+                  <Cell
+                    key="cell-interest"
+                    fill="url(#interestGrad)"
+                    stroke={theme === 'dark' ? '#1c1917' : '#ffffff'}
+                    strokeWidth={2}
+                  />
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+
+            {/* Center text overlay */}
+            <div className="pie-center-overlay">
+              <span className="pie-center-label">Total Cost</span>
+              <span className="pie-center-value">{formatCurrency(totalPaid)}</span>
+            </div>
+          </div>
+
+          {/* Custom pill legend */}
+          <div className="pie-legend-pills">
+            <div className="pie-legend-pill" style={{ '--pill-color': colors.principal } as React.CSSProperties}
+              onMouseEnter={() => setActiveIndex(0)} onMouseLeave={() => setActiveIndex(null)}
+              onClick={() => setActiveIndex(activeIndex === 0 ? null : 0)}>
+              <span className="pie-legend-dot" />
+              <span>Principal</span>
+              <span className="pie-legend-pct">{principalPercent}%</span>
+            </div>
+            <div className="pie-legend-pill" style={{ '--pill-color': colors.interest } as React.CSSProperties}
+              onMouseEnter={() => setActiveIndex(1)} onMouseLeave={() => setActiveIndex(null)}
+              onClick={() => setActiveIndex(activeIndex === 1 ? null : 1)}>
+              <span className="pie-legend-dot" />
+              <span>Interest</span>
+              <span className="pie-legend-pct">{interestPercent}%</span>
+            </div>
+          </div>
+
+          {/* Hover/tap info panel — never blocks the chart */}
+          <div className="pie-info-panel" style={{ opacity: activeIndex !== null ? 1 : 0 }}>
+            {activeIndex !== null && (
+              <>
+                <span className="pie-info-name" style={{ color: chartData[activeIndex].color }}>
+                  {chartData[activeIndex].name}
+                </span>
+                <span className="pie-info-value">{formatCurrency(chartData[activeIndex].value)}</span>
+                <span className="pie-info-pct">
+                  {((chartData[activeIndex].value / totalPaid) * 100).toFixed(1)}% of total
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="breakdown-stats">
