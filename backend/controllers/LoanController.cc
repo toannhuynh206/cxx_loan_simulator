@@ -78,6 +78,14 @@ void LoanController::calculateMultiple(const HttpRequestPtr& req,
             callback(resp);
             return;
         }
+        if (request.loans.size() > 50) {
+            Json::Value error;
+            error["error"] = "Too many loans: maximum 50 allowed";
+            auto resp = HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(k400BadRequest);
+            callback(resp);
+            return;
+        }
 
         loan::MultiLoanResponse response;
         response.totalPrincipal = 0;
@@ -147,6 +155,14 @@ void LoanController::calculateCascade(const HttpRequestPtr& req,
         if (request.loans.empty()) {
             Json::Value error;
             error["error"] = "No loans provided";
+            auto resp = HttpResponse::newHttpJsonResponse(error);
+            resp->setStatusCode(k400BadRequest);
+            callback(resp);
+            return;
+        }
+        if (request.loans.size() > 50) {
+            Json::Value error;
+            error["error"] = "Too many loans: maximum 50 allowed";
             auto resp = HttpResponse::newHttpJsonResponse(error);
             resp->setStatusCode(k400BadRequest);
             callback(resp);

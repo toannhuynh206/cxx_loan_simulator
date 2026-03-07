@@ -6,6 +6,12 @@ interface StrategySelectorProps {
   onChange: (strategy: PayoffStrategyType) => void;
 }
 
+const STRATEGY_HINTS: Record<PayoffStrategyType, string> = {
+  avalanche: 'Highest rate first — saves most money',
+  snowball: 'Smallest balance first — fastest wins',
+  standard: 'Split evenly across all loans',
+};
+
 export const StrategySelector: React.FC<StrategySelectorProps> = ({
   selected,
   onChange
@@ -28,7 +34,10 @@ export const StrategySelector: React.FC<StrategySelectorProps> = ({
                 {strategy === 'snowball' && '❄️'}
                 {strategy === 'standard' && '📊'}
               </span>
-              <span className="strategy-tab__label">{STRATEGY_INFO[strategy].label}</span>
+              <div className="strategy-tab__text">
+                <span className="strategy-tab__label">{STRATEGY_INFO[strategy].label}</span>
+                <span className="strategy-tab__hint">{STRATEGY_HINTS[strategy]}</span>
+              </div>
             </div>
             {strategy === 'avalanche' && (
               <span className="strategy-tab__badge">Recommended</span>

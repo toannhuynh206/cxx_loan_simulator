@@ -3,7 +3,7 @@ import '../mobile.css';
 import { LoanInput } from './LoanInput';
 import { MobileBalanceView } from './MobileBalanceView';
 import { PaymentBreakdownChart } from './PaymentBreakdownChart';
-import { HowItWorks } from './HowItWorks';
+import { MobileGuide } from './MobileGuide';
 import { MobileThemeToggle } from './MobileThemeToggle';
 import { MobileAmortizationTable } from './MobileAmortizationTable';
 import { MobileSimulateTab } from './MobileSimulateTab';
@@ -117,6 +117,9 @@ export const MobileApp: React.FC<MobileAppProps> = ({
     const termStr = years > 0
       ? `${years}yr${months > 0 ? ` ${months}mo` : ''}`
       : `${months}mo`;
+    const today = new Date();
+    const debtFreeDate = new Date(today.getFullYear(), today.getMonth() + loanData.totalMonths, 1);
+    const debtFreeDateStr = debtFreeDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
     return {
       principal: fmtFull(loanData.principal),
       apr: `${loanData.apr.toFixed(2)}%`,
@@ -125,6 +128,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
       termSub: `${loanData.totalMonths} months`,
       interest: fmtFull(loanData.totalInterest),
       total: fmtFull(loanData.principal + loanData.totalInterest),
+      debtFreeDate: debtFreeDateStr,
     };
   }, [loanData, multiLoanData]);
 
@@ -186,6 +190,10 @@ export const MobileApp: React.FC<MobileAppProps> = ({
             {/* Overview stats: Home tab, results exist, form closed */}
             {hasResults && !inputExpanded && stats && (
               <div className="m-tab-content" key="home-overview">
+                <div className="m-debt-free-banner">
+                  <span className="m-debt-free-label">Debt-free by</span>
+                  <span className="m-debt-free-date">{stats.debtFreeDate}</span>
+                </div>
                 <h2 className="m-section-title">Loan Summary</h2>
                 <div className="m-stat-grid">
                   <div className="m-stat-card">
@@ -255,16 +263,14 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         {/* ── GUIDE TAB — fully standalone, no form, no pill ── */}
         {activeTab === 'guide' && (
           <div className="m-tab-content">
-            <div className="m-hiw-wrapper">
-              <HowItWorks loanData={multiLoanData} />
-            </div>
+            <MobileGuide loanData={multiLoanData} />
           </div>
         )}
       </div>
 
       {/* ── Reset pill (floating, above nav) ── */}
       {hasResults && !inputExpanded && activeTab !== 'guide' && (
-        <button className="m-reset-pill" onClick={onReset}>
+        <button className="m-reset-pill" onClick={() => { onReset(); setActiveTab('home'); setInputExpanded(true); }}>
           ↺ Reset
         </button>
       )}

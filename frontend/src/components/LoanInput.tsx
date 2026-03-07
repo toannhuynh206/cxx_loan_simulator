@@ -44,6 +44,7 @@ const EMPTY_LOANS: AllLoans = {
 
 // Sample data for each loan type - realistic scenarios
 const SAMPLE_DATA = {
+  // Federal student loans — realistic disbursement amounts & current fixed rates
   'student-loan': (): StudentLoanEntry[] => [
     { id: generateId(), name: '1-01 Direct Unsubsidized', type: 'student-loan', balance: 2466.11, interestRate: 2.750, monthlyPayment: 0 },
     { id: generateId(), name: '1-02 Direct Subsidized',   type: 'student-loan', balance: 1336.32, interestRate: 2.750, monthlyPayment: 0 },
@@ -60,6 +61,68 @@ const SAMPLE_DATA = {
     { id: generateId(), name: '1-13 Direct Unsubsidized', type: 'student-loan', balance: 957.70,  interestRate: 5.500, monthlyPayment: 0 },
     { id: generateId(), name: '1-14 Direct Subsidized',   type: 'student-loan', balance: 2487.22, interestRate: 5.500, monthlyPayment: 0 },
     { id: generateId(), name: '1-15 Direct Unsubsidized', type: 'student-loan', balance: 932.55,  interestRate: 5.500, monthlyPayment: 0 },
+  ],
+
+  // Credit cards — avg US household carries ~$6,200 across 3-4 cards (2024)
+  // APRs reflect current high-rate environment (Fed funds rate peak 2023-24)
+  'credit-card': (): CreditCardEntry[] => [
+    {
+      id: generateId(), name: 'Chase Freedom Flex', type: 'credit-card',
+      balance: 3420, interestRate: 24.49, apr: 24.49, monthlyPayment: 0,
+      creditLimit: 8500, minimumPaymentPercent: 2, minimumPaymentFloor: 25,
+    },
+    {
+      id: generateId(), name: 'Capital One Quicksilver', type: 'credit-card',
+      balance: 1850, interestRate: 29.99, apr: 29.99, monthlyPayment: 0,
+      creditLimit: 5500, minimumPaymentPercent: 2, minimumPaymentFloor: 25,
+    },
+    {
+      id: generateId(), name: 'Discover it Cash Back', type: 'credit-card',
+      balance: 940, interestRate: 21.99, apr: 21.99, monthlyPayment: 0,
+      creditLimit: 3200, minimumPaymentPercent: 2, minimumPaymentFloor: 25,
+    },
+  ],
+
+  // Personal loan — most common use: debt consolidation ($10-15k, 11-13% for good credit)
+  'personal-loan': (): PersonalLoanEntry[] => [
+    {
+      id: generateId(), name: 'Debt Consolidation', type: 'personal-loan',
+      balance: 11500, interestRate: 11.99, monthlyPayment: 0,
+      termMonths: 48, originationFeePercent: 2.0,
+      hasPrepaymentPenalty: false, prepaymentPenaltyPercent: 2,
+    },
+  ],
+
+  // Auto loan — one entry with both modes pre-filled
+  // Existing: ~2 yrs into a 60-mo loan on a 2022 Camry (balance $18,650 @ 6.99%)
+  // Future:   2025 Honda CR-V EX — balance = 36,000 + 7% tax + $895 fees − $4k down = $35,415
+  'auto-loan': (): AutoLoanEntry[] => [
+    {
+      id: generateId(), name: 'Auto Loan', type: 'auto-loan',
+      inputMode: 'existing',
+      // Existing mode fields
+      balance: 18650, interestRate: 6.99, monthlyPayment: 488, termMonths: 60,
+      // Future mode fields (pre-filled so switching modes shows sample data)
+      vehiclePrice: 36000, downPayment: 4000, tradeInValue: 0, tradeInPayoff: 0,
+      salesTaxPercent: 7.0, docAndRegFees: 895,
+      vehicleYear: 2025, isUsed: false,
+    },
+  ],
+
+  // Mortgage — one entry with both modes pre-filled
+  // Existing: 2021 refi at historically low rates (~3.125%), ~4 yrs in on a $310k original loan
+  // Future:   US median home ($417k, NAR 2024), 20% down, current 30-yr rate ~6.875%
+  'mortgage': (): MortgageEntry[] => [
+    {
+      id: generateId(), name: 'Mortgage', type: 'mortgage',
+      inputMode: 'existing',
+      // Existing mode fields
+      balance: 287500, interestRate: 3.125, monthlyPayment: 1231, termYears: 30,
+      // Future mode fields (pre-filled so switching modes shows sample data)
+      homePrice: 417000, downPayment: 83400, downPaymentPercent: 20,
+      propertyTaxAnnual: 0, homeInsuranceAnnual: 0, pmiRate: 0.5,
+      hoaMonthly: 0, includeEscrow: false,
+    },
   ],
 };
 
@@ -88,6 +151,8 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
         type: 'personal-loan',
         termMonths: 36,
         originationFeePercent: 0,
+        hasPrepaymentPenalty: false,
+        prepaymentPenaltyPercent: 2,
       } as PersonalLoanEntry;
     case 'auto-loan':
       return {
@@ -101,6 +166,8 @@ const createEmptyLoan = (type: LoanType): LoanEntry => {
         tradeInPayoff: 0,
         vehicleYear: new Date().getFullYear(),
         isUsed: false,
+        salesTaxPercent: 0,
+        docAndRegFees: 0,
       } as AutoLoanEntry;
     case 'mortgage':
       return {
@@ -178,18 +245,45 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
   };
 
   const loadSampleData = (type: LoanType) => {
-    if (type === 'student-loan' && SAMPLE_DATA['student-loan']) {
-      const sampleLoans = SAMPLE_DATA['student-loan']();
-      setLoans(prev => ({
-        ...prev,
-        'student-loan': sampleLoans,
-      }));
+    const generator = SAMPLE_DATA[type as keyof typeof SAMPLE_DATA];
+    if (!generator) return;
 
-      // Calculate total minimum payment using Standard Repayment Plan
-      const totalMin = sampleLoans.reduce((sum, loan) => {
-        return sum + paymentForTerm(loan.balance, loan.interestRate, 120);
+    const sampleLoans = (generator as () => LoanEntry[])();
+    setLoans(prev => ({ ...prev, [type]: sampleLoans }));
+
+    if (type === 'student-loan') {
+      // Default budget = sum of Standard Repayment minimums (120 months)
+      const totalMin = (sampleLoans as StudentLoanEntry[]).reduce((sum, loan) =>
+        sum + paymentForTerm(loan.balance, loan.interestRate, 120), 0);
+      setAllocationBudget(Math.ceil(totalMin));
+      setShowAllocation(false);
+    } else if (type === 'credit-card') {
+      // Budget = sum of effective minimums: max(policy min, interest floor + $0.01)
+      // Must use interest-floor-aware formula — for high-APR cards the 2% minimum
+      // can fall below monthly interest, which would never pay off the balance.
+      const totalMin = (sampleLoans as CreditCardEntry[]).reduce((sum, loan) => {
+        const cc = loan as CreditCardEntry;
+        const policyMin = Math.max(cc.balance * (cc.minimumPaymentPercent / 100), cc.minimumPaymentFloor);
+        const interestFloor = monthlyInterestForLoan(cc.balance, cc.apr, 'credit-card') + 0.01;
+        return sum + Math.max(policyMin, interestFloor);
       }, 0);
-
+      setAllocationBudget(Math.ceil(totalMin));
+      setShowAllocation(false);
+    } else if (type === 'personal-loan') {
+      const totalMin = (sampleLoans as PersonalLoanEntry[]).reduce((sum, loan) =>
+        sum + paymentForTerm(loan.balance, loan.interestRate, loan.termMonths || 48, 'personal-loan'), 0);
+      setAllocationBudget(Math.ceil(totalMin));
+      setShowAllocation(false);
+    } else if (type === 'auto-loan') {
+      // Single merged entry — use the existing mode payment as the budget baseline
+      const totalMin = (sampleLoans as AutoLoanEntry[]).reduce((sum, loan) =>
+        sum + (loan.monthlyPayment > 0 ? loan.monthlyPayment : paymentForTerm(loan.balance, loan.interestRate, loan.termMonths || 60, 'auto-loan')), 0);
+      setAllocationBudget(Math.ceil(totalMin));
+      setShowAllocation(false);
+    } else if (type === 'mortgage') {
+      // Single merged entry — use the existing mode payment as the budget baseline
+      const totalMin = (sampleLoans as MortgageEntry[]).reduce((sum, loan) =>
+        sum + (loan.monthlyPayment > 0 ? loan.monthlyPayment : paymentForTerm(loan.balance, loan.interestRate, (loan.termYears || 30) * 12, 'mortgage')), 0);
       setAllocationBudget(Math.ceil(totalMin));
       setShowAllocation(false);
     }
@@ -209,6 +303,22 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
   const getEffectiveRate = (loan: LoanEntry): number =>
     loan.type === 'credit-card' ? (loan as CreditCardEntry).apr : loan.interestRate;
 
+  // Compute effective APR including origination fee via binary search (IRR).
+  const computeEffectiveAPR = (balance: number, feePercent: number, termMonths: number, statedAPR: number): number | null => {
+    if (feePercent <= 0 || balance <= 0 || termMonths <= 0) return null;
+    const r = statedAPR / 100 / 12;
+    const pmt = r > 0 ? balance * r / (1 - Math.pow(1 + r, -termMonths)) : balance / termMonths;
+    const netProceeds = balance * (1 - feePercent / 100);
+    let lo = r * 0.5, hi = Math.max(r * 5, 0.05);
+    for (let i = 0; i < 200; i++) {
+      const mid = (lo + hi) / 2;
+      if (mid <= 0) break;
+      const pv = pmt / mid * (1 - Math.pow(1 + mid, -termMonths));
+      if (pv > netProceeds) lo = mid; else hi = mid;
+    }
+    return ((lo + hi) / 2) * 12 * 100;
+  };
+
   // Generic minimum payment for any loan type.
   // Used for both the allocation algorithm and the manual-mode sliders.
   const computeLoanMinimum = (loan: LoanEntry): number => {
@@ -223,16 +333,12 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         return paymentForTerm(loan.balance, loan.interestRate, (loan as PersonalLoanEntry).termMonths || 60, 'personal-loan');
       case 'auto-loan': {
         const autoLoan = loan as AutoLoanEntry;
-        if ((autoLoan.inputMode ?? 'future') === 'existing' && autoLoan.monthlyPayment > 0) {
-          return autoLoan.monthlyPayment;
-        }
+        if (autoLoan.monthlyPayment > 0) return autoLoan.monthlyPayment;
         return paymentForTerm(loan.balance, loan.interestRate, autoLoan.termMonths || 60, 'auto-loan');
       }
       case 'mortgage': {
         const mortgage = loan as MortgageEntry;
-        if ((mortgage.inputMode ?? 'future') === 'existing' && mortgage.monthlyPayment > 0) {
-          return mortgage.monthlyPayment;
-        }
+        if (mortgage.monthlyPayment > 0) return mortgage.monthlyPayment;
         const termMonths = (mortgage.termYears || 30) * 12;
         return paymentForTerm(loan.balance, loan.interestRate, termMonths, 'mortgage');
       }
@@ -356,12 +462,14 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     const invalidAutoLoans = loans['auto-loan'].filter((loan) => {
       if (loan.balance <= 0) return false;
       const mode = loan.inputMode ?? 'future';
+      if (mode === 'existing') {
+        return loan.interestRate <= 0 || loan.interestRate > 100 || loan.monthlyPayment <= 0;
+      }
       return (
         loan.vehiclePrice <= 0 ||
         loan.interestRate <= 0 ||
         loan.interestRate > 100 ||
         loan.termMonths <= 0 ||
-        (mode === 'existing' && loan.monthlyPayment <= 0) ||
         loan.downPayment < 0 ||
         loan.tradeInValue < 0 ||
         loan.tradeInPayoff < 0
@@ -370,7 +478,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
 
     if (invalidAutoLoans.length > 0) {
       setSubmitError(
-        'Auto loans require: balance > 0, vehicle value/price > 0, APR between 0 and 100, valid term, non-negative optional amounts, and monthly payment > 0 in existing mode.'
+        'Auto loans require: balance > 0, APR between 0 and 100, and monthly payment > 0 in existing mode. For future purchase: vehicle price > 0 and valid term.'
       );
       return;
     }
@@ -379,7 +487,11 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
       if (loan.balance <= 0) return false;
       const mode = loan.inputMode ?? 'future';
 
-      const commonInvalid =
+      if (mode === 'existing') {
+        return loan.interestRate <= 0 || loan.interestRate > 100 || loan.monthlyPayment <= 0;
+      }
+
+      return (
         loan.homePrice <= 0 ||
         loan.interestRate <= 0 ||
         loan.interestRate > 100 ||
@@ -387,25 +499,53 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
         loan.propertyTaxAnnual < 0 ||
         loan.homeInsuranceAnnual < 0 ||
         loan.pmiRate < 0 ||
-        loan.hoaMonthly < 0;
-
-      if (commonInvalid) return true;
-      if (mode === 'future') {
-        return loan.downPayment < 0 || loan.downPayment > loan.homePrice;
-      }
-      return loan.monthlyPayment <= 0;
+        loan.hoaMonthly < 0 ||
+        loan.downPayment < 0 ||
+        loan.downPayment > loan.homePrice
+      );
     });
 
     if (invalidMortgages.length > 0) {
       setSubmitError(
-        'Mortgages require: balance > 0, home value/price > 0, APR between 0 and 100, valid term, non-negative taxes/insurance/HOA/PMI, and monthly payment > 0 in existing mode.'
+        'Mortgages require: balance > 0, APR between 0 and 100, and monthly P&I payment > 0 in existing mode. For future purchase: home price > 0, valid term, and valid down payment.'
       );
+      return;
+    }
+
+    const invalidCreditCards = loans['credit-card'].filter((loan) => {
+      if (loan.balance <= 0) return false;
+      return loan.apr < 0 || loan.apr > 100;
+    });
+    if (invalidCreditCards.length > 0) {
+      setSubmitError('Credit cards require APR between 0 and 100%.');
+      return;
+    }
+
+    const invalidStudentLoans = loans['student-loan'].filter((loan) => {
+      if (loan.balance <= 0) return false;
+      return loan.interestRate < 0 || loan.interestRate > 20;
+    });
+    if (invalidStudentLoans.length > 0) {
+      setSubmitError('Student loans require an interest rate between 0 and 20%.');
+      return;
+    }
+
+    const invalidPersonalLoans = loans['personal-loan'].filter((loan) => {
+      if (loan.balance <= 0) return false;
+      return loan.interestRate < 0 || loan.interestRate > 100 || loan.termMonths <= 0;
+    });
+    if (invalidPersonalLoans.length > 0) {
+      setSubmitError('Personal loans require APR between 0 and 100% and a valid term.');
       return;
     }
 
     setSubmitError(null);
     const allLoans = loans[lockedType!].filter(l => l.balance > 0);
     if (allLoans.length === 0) return;
+    if (allLoans.length > 50) {
+      setSubmitError('Maximum 50 loans allowed per simulation.');
+      return;
+    }
 
     if (allocationMode === 'auto' && allLoans.length > 1 && activeTab !== 'mortgage') {
       onCalculate(allLoans, allocationBudget, allocationStrategy, 'auto');
@@ -546,7 +686,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           <div className="input-wrapper">
             <select
               value={loan.termMonths}
-              onChange={(e) => updateLoan('personal-loan', loan.id, 'termMonths', parseInt(e.target.value))}
+              onChange={(e) => updateLoan('personal-loan', loan.id, 'termMonths', parseInt(e.target.value, 10) || 36)}
               className="form-select"
             >
               <option value={12}>12 months</option>
@@ -598,6 +738,53 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             <span className="input-suffix">%</span>
           </div>
         </div>
+        {(loan.originationFeePercent || 0) > 0 && loan.balance > 0 && loan.termMonths > 0 && (() => {
+          const effectiveAPR = computeEffectiveAPR(loan.balance, loan.originationFeePercent || 0, loan.termMonths, loan.interestRate || 0);
+          return effectiveAPR !== null ? (
+            <div className="form-group">
+              <label>Effective APR</label>
+              <div className="input-wrapper input-wrapper--readonly">
+                <input
+                  type="text"
+                  value={`${effectiveAPR.toFixed(2)}%`}
+                  readOnly
+                  className="input--readonly input--info"
+                />
+              </div>
+              <span className="form-hint">True cost including origination fee</span>
+            </div>
+          ) : null;
+        })()}
+      </div>
+      <div className="loan-entry__fields loan-entry__fields--tertiary">
+        <div className="form-group form-group--checkbox">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={loan.hasPrepaymentPenalty || false}
+              onChange={(e) => updateLoan('personal-loan', loan.id, 'hasPrepaymentPenalty', e.target.checked)}
+            />
+            <span>Prepayment penalty</span>
+            <InfoTooltip {...FIELD_DEFINITIONS.prepaymentPenalty} />
+          </label>
+        </div>
+        {loan.hasPrepaymentPenalty && (
+          <div className="form-group">
+            <label>Penalty Rate</label>
+            <div className="input-wrapper">
+              <input
+                type="number"
+                step="0.5"
+                min="0"
+                max="10"
+                value={loan.prepaymentPenaltyPercent ?? 2}
+                onChange={(e) => updateLoan('personal-loan', loan.id, 'prepaymentPenaltyPercent', parseFloat(e.target.value) || 0)}
+                placeholder="2"
+              />
+              <span className="input-suffix">% of balance</span>
+            </div>
+          </div>
+        )}
       </div>
     </>
     );
@@ -608,52 +795,64 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
     loan: AutoLoanEntry | MortgageEntry
   ) => {
     const inputMode: LoanInputMode = loan.inputMode ?? 'future';
-    const assetLabel = type === 'auto-loan' ? 'car' : 'home';
+
+    const futureIcon = type === 'auto-loan' ? (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="12" x2="15" y2="14"/>
+        <path d="M5 3L3 5M19 3l2 2M5 21l-2-2M19 21l2-2" strokeWidth="1.5"/>
+      </svg>
+    ) : (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+    );
+
+    const existingIcon = (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+        <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+      </svg>
+    );
+
+    const futureDesc  = type === 'auto-loan' ? 'Calculate from purchase price'   : 'Calculate from purchase price';
+    const existingDesc = type === 'auto-loan' ? 'Enter current balance & payment' : 'Enter current balance & payment';
 
     return (
-      <div className="loan-entry__mode">
-        <div className="mode-toggle">
-          <div className="mode-toggle__option">
-            <button
-              type="button"
-              className={`mode-toggle__btn ${inputMode === 'future' ? 'mode-toggle__btn--active' : ''}`}
-              onClick={() => updateLoan(type, loan.id, 'inputMode', 'future')}
-            >
-              Future Purchase
-            </button>
-            <div className="mode-tooltip">
-              <strong>Plan Before You Buy</strong>
-              <p>Use purchase assumptions like price, down payment, and term to estimate monthly cost.</p>
-              <span className="mode-tooltip__hint">Best when you are shopping for a {assetLabel}.</span>
-            </div>
-          </div>
-          <div className="mode-toggle__option">
-            <button
-              type="button"
-              className={`mode-toggle__btn ${inputMode === 'existing' ? 'mode-toggle__btn--active' : ''}`}
-              onClick={() => updateLoan(type, loan.id, 'inputMode', 'existing')}
-            >
-              Existing Loan
-            </button>
-            <div className="mode-tooltip">
-              <strong>Use Statement Values</strong>
-              <p>Enter current balance, APR, and your required monthly payment for real-life amortization.</p>
-              <span className="mode-tooltip__hint">Best when this loan is already active.</span>
-            </div>
-          </div>
-        </div>
-        <p className="loan-entry__mode-helper">
-          {inputMode === 'future'
-            ? `Planning mode for a future ${assetLabel} purchase.`
-            : `Existing-loan mode using your current balance and monthly payment.`}
-        </p>
+      <div className="loan-mode-selector">
+        <button
+          type="button"
+          className={`loan-mode-card ${inputMode === 'future' ? 'loan-mode-card--active' : ''}`}
+          onClick={() => updateLoan(type, loan.id, 'inputMode', 'future')}
+        >
+          <span className="loan-mode-card__icon">{futureIcon}</span>
+          <span className="loan-mode-card__body">
+            <span className="loan-mode-card__label">Future Purchase</span>
+            <span className="loan-mode-card__desc">{futureDesc}</span>
+          </span>
+          <span className="loan-mode-card__check">
+            <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="8" opacity="0.15"/><circle cx="8" cy="8" r="4"/></svg>
+          </span>
+        </button>
+        <button
+          type="button"
+          className={`loan-mode-card ${inputMode === 'existing' ? 'loan-mode-card--active' : ''}`}
+          onClick={() => updateLoan(type, loan.id, 'inputMode', 'existing')}
+        >
+          <span className="loan-mode-card__icon">{existingIcon}</span>
+          <span className="loan-mode-card__body">
+            <span className="loan-mode-card__label">Existing Loan</span>
+            <span className="loan-mode-card__desc">{existingDesc}</span>
+          </span>
+          <span className="loan-mode-card__check">
+            <svg viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="8" opacity="0.15"/><circle cx="8" cy="8" r="4"/></svg>
+          </span>
+        </button>
       </div>
     );
   };
 
   const renderAutoLoanFields = (loan: AutoLoanEntry) => {
     const inputMode: LoanInputMode = loan.inputMode ?? 'future';
-    const equity = (loan.vehiclePrice || 0) - (loan.balance || 0);
 
     if (inputMode === 'existing') {
       return (
@@ -697,7 +896,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
             <div className="form-group">
               <div className="label-with-tooltip">
-                <label>Minimum Payment</label>
+                <label>Monthly Payment</label>
                 <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
               </div>
               <div className="input-wrapper">
@@ -713,88 +912,15 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
               </div>
             </div>
           </div>
-          <div className="loan-entry__fields loan-entry__fields--secondary">
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>Remaining Term</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.termMonths} />
-              </div>
-              <div className="input-wrapper">
-                <input
-                  type="number"
-                  min="1"
-                  max="120"
-                  value={loan.termMonths || ''}
-                  onChange={(e) => updateLoan('auto-loan', loan.id, 'termMonths', parseInt(e.target.value, 10) || 60)}
-                  placeholder="60"
-                />
-                <span className="input-suffix">mo</span>
-              </div>
-            </div>
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>Current Vehicle Value</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.vehiclePrice} />
-              </div>
-              <div className="input-wrapper">
-                <span className="input-prefix">$</span>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={loan.vehiclePrice || ''}
-                  onChange={(e) => updateLoan('auto-loan', loan.id, 'vehiclePrice', parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>Vehicle Year</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.vehicleYear} />
-              </div>
-              <div className="input-wrapper">
-                <input
-                  type="number"
-                  min="1990"
-                  max={new Date().getFullYear() + 1}
-                  value={loan.vehicleYear || ''}
-                  onChange={(e) => updateLoan('auto-loan', loan.id, 'vehicleYear', parseInt(e.target.value, 10) || new Date().getFullYear())}
-                  placeholder={new Date().getFullYear().toString()}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="loan-entry__fields loan-entry__fields--tertiary">
-            <div className="form-group">
-              <label>Vehicle Type</label>
-              <div className="input-wrapper">
-                <select
-                  value={loan.isUsed ? 'used' : 'new'}
-                  onChange={(e) => updateLoan('auto-loan', loan.id, 'isUsed', e.target.value === 'used')}
-                  className="form-select"
-                >
-                  <option value="new">New</option>
-                  <option value="used">Used</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Estimated Equity</label>
-              <div className="input-wrapper input-wrapper--readonly">
-                <span className="input-prefix">$</span>
-                <input
-                  type="text"
-                  value={equity.toFixed(2)}
-                  readOnly
-                  className={`input--readonly ${equity < 0 ? 'input--warning' : 'input--success'}`}
-                />
-              </div>
-            </div>
-          </div>
         </>
       );
     }
+
+    // Helper: recompute loan amount from all future-mode inputs
+    const computeAutoBalance = (
+      price: number, tax: number, fees: number,
+      down: number, tradeIn: number, tradeInPayoff: number
+    ) => Math.max(0, price + price * (tax / 100) + fees - down - tradeIn + tradeInPayoff);
 
     return (
       <>
@@ -815,8 +941,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 onChange={(e) => {
                   const price = parseFloat(e.target.value) || 0;
                   updateLoan('auto-loan', loan.id, 'vehiclePrice', price);
-                  const balance = price - (loan.downPayment || 0) - (loan.tradeInValue || 0) + (loan.tradeInPayoff || 0);
-                  updateLoan('auto-loan', loan.id, 'balance', Math.max(0, balance));
+                  updateLoan('auto-loan', loan.id, 'balance', computeAutoBalance(price, loan.salesTaxPercent || 0, loan.docAndRegFees || 0, loan.downPayment || 0, loan.tradeInValue || 0, loan.tradeInPayoff || 0));
                 }}
                 placeholder="0.00"
               />
@@ -837,8 +962,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 onChange={(e) => {
                   const down = parseFloat(e.target.value) || 0;
                   updateLoan('auto-loan', loan.id, 'downPayment', down);
-                  const balance = (loan.vehiclePrice || 0) - down - (loan.tradeInValue || 0) + (loan.tradeInPayoff || 0);
-                  updateLoan('auto-loan', loan.id, 'balance', Math.max(0, balance));
+                  updateLoan('auto-loan', loan.id, 'balance', computeAutoBalance(loan.vehiclePrice || 0, loan.salesTaxPercent || 0, loan.docAndRegFees || 0, down, loan.tradeInValue || 0, loan.tradeInPayoff || 0));
                 }}
                 placeholder="0.00"
               />
@@ -885,6 +1009,51 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
           </div>
           <div className="form-group">
             <div className="label-with-tooltip">
+              <label>Sales Tax</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.salesTax} />
+            </div>
+            <div className="input-wrapper">
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="20"
+                value={loan.salesTaxPercent || ''}
+                onChange={(e) => {
+                  const tax = parseFloat(e.target.value) || 0;
+                  updateLoan('auto-loan', loan.id, 'salesTaxPercent', tax);
+                  updateLoan('auto-loan', loan.id, 'balance', computeAutoBalance(loan.vehiclePrice || 0, tax, loan.docAndRegFees || 0, loan.downPayment || 0, loan.tradeInValue || 0, loan.tradeInPayoff || 0));
+                }}
+                placeholder="0.0"
+              />
+              <span className="input-suffix">%</span>
+            </div>
+          </div>
+          <div className="form-group">
+            <div className="label-with-tooltip">
+              <label>Doc &amp; Reg Fees</label>
+              <InfoTooltip {...FIELD_DEFINITIONS.docAndRegFees} />
+            </div>
+            <div className="input-wrapper">
+              <span className="input-prefix">$</span>
+              <input
+                type="number"
+                step="10"
+                min="0"
+                value={loan.docAndRegFees || ''}
+                onChange={(e) => {
+                  const fees = parseFloat(e.target.value) || 0;
+                  updateLoan('auto-loan', loan.id, 'docAndRegFees', fees);
+                  updateLoan('auto-loan', loan.id, 'balance', computeAutoBalance(loan.vehiclePrice || 0, loan.salesTaxPercent || 0, fees, loan.downPayment || 0, loan.tradeInValue || 0, loan.tradeInPayoff || 0));
+                }}
+                placeholder="0"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="loan-entry__fields loan-entry__fields--secondary">
+          <div className="form-group">
+            <div className="label-with-tooltip">
               <label>Trade-in Value</label>
               <InfoTooltip {...FIELD_DEFINITIONS.tradeInValue} />
             </div>
@@ -898,8 +1067,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 onChange={(e) => {
                   const tradeIn = parseFloat(e.target.value) || 0;
                   updateLoan('auto-loan', loan.id, 'tradeInValue', tradeIn);
-                  const balance = (loan.vehiclePrice || 0) - (loan.downPayment || 0) - tradeIn + (loan.tradeInPayoff || 0);
-                  updateLoan('auto-loan', loan.id, 'balance', Math.max(0, balance));
+                  updateLoan('auto-loan', loan.id, 'balance', computeAutoBalance(loan.vehiclePrice || 0, loan.salesTaxPercent || 0, loan.docAndRegFees || 0, loan.downPayment || 0, tradeIn, loan.tradeInPayoff || 0));
                 }}
                 placeholder="0.00"
               />
@@ -920,56 +1088,36 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 onChange={(e) => {
                   const payoff = parseFloat(e.target.value) || 0;
                   updateLoan('auto-loan', loan.id, 'tradeInPayoff', payoff);
-                  const balance = (loan.vehiclePrice || 0) - (loan.downPayment || 0) - (loan.tradeInValue || 0) + payoff;
-                  updateLoan('auto-loan', loan.id, 'balance', Math.max(0, balance));
+                  updateLoan('auto-loan', loan.id, 'balance', computeAutoBalance(loan.vehiclePrice || 0, loan.salesTaxPercent || 0, loan.docAndRegFees || 0, loan.downPayment || 0, loan.tradeInValue || 0, payoff));
                 }}
                 placeholder="0.00"
               />
             </div>
           </div>
-        </div>
-        <div className="loan-entry__fields loan-entry__fields--tertiary">
-          <div className="form-group">
-            <label>Loan Amount</label>
-            <div className="input-wrapper input-wrapper--readonly">
-              <span className="input-prefix">$</span>
-              <input
-                type="number"
-                value={loan.balance || 0}
-                readOnly
-                className="input--readonly"
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <div className="label-with-tooltip">
-              <label>Vehicle Year</label>
-              <InfoTooltip {...FIELD_DEFINITIONS.vehicleYear} />
-            </div>
-            <div className="input-wrapper">
-              <input
-                type="number"
-                min="1990"
-                max={new Date().getFullYear() + 1}
-                value={loan.vehicleYear || ''}
-                onChange={(e) => updateLoan('auto-loan', loan.id, 'vehicleYear', parseInt(e.target.value, 10) || new Date().getFullYear())}
-                placeholder={new Date().getFullYear().toString()}
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <label>Vehicle Type</label>
-            <div className="input-wrapper">
-              <select
-                value={loan.isUsed ? 'used' : 'new'}
-                onChange={(e) => updateLoan('auto-loan', loan.id, 'isUsed', e.target.value === 'used')}
-                className="form-select"
-              >
-                <option value="new">New</option>
-                <option value="used">Used</option>
-              </select>
-            </div>
-          </div>
+          {(() => {
+            const minPmt = loan.balance > 0 && loan.interestRate > 0
+              ? paymentForTerm(loan.balance, loan.interestRate, loan.termMonths || 60, 'auto-loan')
+              : 0;
+            return (
+              <div className="form-group">
+                <div className="label-with-tooltip">
+                  <label>Monthly Payment</label>
+                  <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
+                </div>
+                <div className="input-wrapper">
+                  <span className="input-prefix">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={loan.monthlyPayment || ''}
+                    onChange={(e) => updateLoan('auto-loan', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
+                    placeholder={minPmt > 0 ? `Min: $${minPmt.toFixed(0)}` : 'Auto-calculated'}
+                  />
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </>
     );
@@ -978,8 +1126,6 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
   const renderMortgageFields = (loan: MortgageEntry) => {
     const inputMode: LoanInputMode = loan.inputMode ?? 'future';
     const futureDownPaymentPercent = loan.homePrice > 0 ? (loan.downPayment / loan.homePrice) * 100 : 0;
-    const currentLtvPercent = loan.homePrice > 0 ? (loan.balance / loan.homePrice) * 100 : 0;
-    const needsPMI = inputMode === 'future' ? futureDownPaymentPercent < 20 : currentLtvPercent > 80;
 
     if (inputMode === 'existing') {
       return (
@@ -1023,7 +1169,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
             <div className="form-group">
               <div className="label-with-tooltip">
-                <label>Monthly P&I Payment</label>
+                <label>Monthly Payment</label>
                 <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
               </div>
               <div className="input-wrapper">
@@ -1038,148 +1184,6 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 />
               </div>
             </div>
-          </div>
-          <div className="loan-entry__fields loan-entry__fields--secondary">
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>Remaining Term</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.mortgageTerm} />
-              </div>
-              <div className="input-wrapper">
-                <select
-                  value={loan.termYears}
-                  onChange={(e) => updateLoan('mortgage', loan.id, 'termYears', parseInt(e.target.value, 10))}
-                  className="form-select"
-                >
-                  <option value={10}>10 years</option>
-                  <option value={15}>15 years</option>
-                  <option value={20}>20 years</option>
-                  <option value={30}>30 years</option>
-                </select>
-              </div>
-            </div>
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>Estimated Home Value</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.homePrice} />
-              </div>
-              <div className="input-wrapper">
-                <span className="input-prefix">$</span>
-                <input
-                  type="number"
-                  step="1000"
-                  min="0"
-                  value={loan.homePrice || ''}
-                  onChange={(e) => updateLoan('mortgage', loan.id, 'homePrice', parseFloat(e.target.value) || 0)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <div className="form-group">
-              <label>Current LTV</label>
-              <div className="input-wrapper input-wrapper--readonly">
-                <input
-                  type="text"
-                  value={`${currentLtvPercent.toFixed(1)}%`}
-                  readOnly
-                  className={`input--readonly ${needsPMI ? 'input--warning' : 'input--success'}`}
-                />
-              </div>
-            </div>
-          </div>
-          <div className="loan-entry__fields loan-entry__fields--tertiary">
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>Property Tax (Annual)</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.propertyTax} />
-              </div>
-              <div className="input-wrapper">
-                <span className="input-prefix">$</span>
-                <input
-                  type="number"
-                  step="100"
-                  min="0"
-                  value={loan.propertyTaxAnnual || ''}
-                  onChange={(e) => updateLoan('mortgage', loan.id, 'propertyTaxAnnual', parseFloat(e.target.value) || 0)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>Home Insurance (Annual)</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.homeInsurance} />
-              </div>
-              <div className="input-wrapper">
-                <span className="input-prefix">$</span>
-                <input
-                  type="number"
-                  step="100"
-                  min="0"
-                  value={loan.homeInsuranceAnnual || ''}
-                  onChange={(e) => updateLoan('mortgage', loan.id, 'homeInsuranceAnnual', parseFloat(e.target.value) || 0)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <div className="form-group">
-              <div className="label-with-tooltip">
-                <label>HOA (Monthly)</label>
-                <InfoTooltip {...FIELD_DEFINITIONS.hoa} />
-              </div>
-              <div className="input-wrapper">
-                <span className="input-prefix">$</span>
-                <input
-                  type="number"
-                  step="10"
-                  min="0"
-                  value={loan.hoaMonthly || ''}
-                  onChange={(e) => updateLoan('mortgage', loan.id, 'hoaMonthly', parseFloat(e.target.value) || 0)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-          </div>
-          <div className="loan-entry__fields loan-entry__fields--pmi">
-            <div className="form-group">
-              <label>Include Escrow</label>
-              <div className="input-wrapper">
-                <select
-                  value={loan.includeEscrow ? 'yes' : 'no'}
-                  onChange={(e) => updateLoan('mortgage', loan.id, 'includeEscrow', e.target.value === 'yes')}
-                  className="form-select"
-                >
-                  <option value="yes">Yes (tax + insurance + HOA)</option>
-                  <option value="no">No (P&I only)</option>
-                </select>
-              </div>
-            </div>
-            {needsPMI && (
-              <>
-                <div className="form-group">
-                  <div className="label-with-tooltip">
-                    <label>PMI Rate (Annual)</label>
-                    <InfoTooltip {...FIELD_DEFINITIONS.pmiRate} />
-                  </div>
-                  <div className="input-wrapper">
-                    <input
-                      type="number"
-                      step="0.1"
-                      min="0"
-                      max="3"
-                      value={loan.pmiRate || ''}
-                      onChange={(e) => updateLoan('mortgage', loan.id, 'pmiRate', parseFloat(e.target.value) || 0.5)}
-                      placeholder="0.5"
-                    />
-                    <span className="input-suffix">%</span>
-                  </div>
-                </div>
-                <div className="pmi-notice">
-                  <span className="pmi-notice__icon">!</span>
-                  <span>PMI may apply while your estimated LTV stays above 80%.</span>
-                </div>
-              </>
-            )}
           </div>
         </>
       );
@@ -1274,18 +1278,6 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
             </div>
           </div>
           <div className="form-group">
-            <label>Loan Amount</label>
-            <div className="input-wrapper input-wrapper--readonly">
-              <span className="input-prefix">$</span>
-              <input
-                type="number"
-                value={loan.balance || 0}
-                readOnly
-                className="input--readonly"
-              />
-            </div>
-          </div>
-          <div className="form-group">
             <div className="label-with-tooltip">
               <label>Down Payment %</label>
               <InfoTooltip {...FIELD_DEFINITIONS.downPaymentPercent} />
@@ -1295,104 +1287,35 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
                 type="text"
                 value={`${futureDownPaymentPercent.toFixed(1)}%`}
                 readOnly
-                className={`input--readonly ${needsPMI ? 'input--warning' : 'input--success'}`}
+                className="input--readonly"
               />
             </div>
           </div>
-        </div>
-        <div className="loan-entry__fields loan-entry__fields--tertiary">
-          <div className="form-group">
-            <div className="label-with-tooltip">
-              <label>Property Tax (Annual)</label>
-              <InfoTooltip {...FIELD_DEFINITIONS.propertyTax} />
-            </div>
-            <div className="input-wrapper">
-              <span className="input-prefix">$</span>
-              <input
-                type="number"
-                step="100"
-                min="0"
-                value={loan.propertyTaxAnnual || ''}
-                onChange={(e) => updateLoan('mortgage', loan.id, 'propertyTaxAnnual', parseFloat(e.target.value) || 0)}
-                placeholder="0"
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <div className="label-with-tooltip">
-              <label>Home Insurance (Annual)</label>
-              <InfoTooltip {...FIELD_DEFINITIONS.homeInsurance} />
-            </div>
-            <div className="input-wrapper">
-              <span className="input-prefix">$</span>
-              <input
-                type="number"
-                step="100"
-                min="0"
-                value={loan.homeInsuranceAnnual || ''}
-                onChange={(e) => updateLoan('mortgage', loan.id, 'homeInsuranceAnnual', parseFloat(e.target.value) || 0)}
-                placeholder="0"
-              />
-            </div>
-          </div>
-          <div className="form-group">
-            <div className="label-with-tooltip">
-              <label>HOA (Monthly)</label>
-              <InfoTooltip {...FIELD_DEFINITIONS.hoa} />
-            </div>
-            <div className="input-wrapper">
-              <span className="input-prefix">$</span>
-              <input
-                type="number"
-                step="10"
-                min="0"
-                value={loan.hoaMonthly || ''}
-                onChange={(e) => updateLoan('mortgage', loan.id, 'hoaMonthly', parseFloat(e.target.value) || 0)}
-                placeholder="0"
-              />
-            </div>
-          </div>
-        </div>
-        <div className="loan-entry__fields loan-entry__fields--pmi">
-          <div className="form-group">
-            <label>Include Escrow</label>
-            <div className="input-wrapper">
-              <select
-                value={loan.includeEscrow ? 'yes' : 'no'}
-                onChange={(e) => updateLoan('mortgage', loan.id, 'includeEscrow', e.target.value === 'yes')}
-                className="form-select"
-              >
-                <option value="yes">Yes (tax + insurance + HOA)</option>
-                <option value="no">No (P&I only)</option>
-              </select>
-            </div>
-          </div>
-          {needsPMI && (
-            <>
+          {(() => {
+            const termMonths = (loan.termYears || 30) * 12;
+            const minPmt = loan.balance > 0 && loan.interestRate > 0
+              ? paymentForTerm(loan.balance, loan.interestRate, termMonths, 'mortgage')
+              : 0;
+            return (
               <div className="form-group">
                 <div className="label-with-tooltip">
-                  <label>PMI Rate (Annual)</label>
-                  <InfoTooltip {...FIELD_DEFINITIONS.pmiRate} />
+                  <label>Monthly Payment</label>
+                  <InfoTooltip {...FIELD_DEFINITIONS.monthlyPayment} />
                 </div>
                 <div className="input-wrapper">
+                  <span className="input-prefix">$</span>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
-                    max="3"
-                    value={loan.pmiRate || ''}
-                    onChange={(e) => updateLoan('mortgage', loan.id, 'pmiRate', parseFloat(e.target.value) || 0.5)}
-                    placeholder="0.5"
+                    value={loan.monthlyPayment || ''}
+                    onChange={(e) => updateLoan('mortgage', loan.id, 'monthlyPayment', parseFloat(e.target.value) || 0)}
+                    placeholder={minPmt > 0 ? `Min: ${minPmt.toFixed(0)}` : 'Auto-calculated'}
                   />
-                  <span className="input-suffix">%</span>
                 </div>
               </div>
-              <div className="pmi-notice">
-                <span className="pmi-notice__icon">!</span>
-                <span>PMI required until you reach 20% equity</span>
-              </div>
-            </>
-          )}
+            );
+          })()}
         </div>
       </>
     );
@@ -1501,7 +1424,7 @@ export const LoanInput: React.FC<LoanInputProps> = ({ onCalculate, isLoading }) 
               >
                 + Add Your First {activeTypeInfo.label}
               </button>
-              {activeTab === 'student-loan' && (
+              {(activeTab as string) in SAMPLE_DATA && (
                 <>
                   <span className="empty-divider">or</span>
                   <button

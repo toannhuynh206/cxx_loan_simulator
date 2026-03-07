@@ -93,7 +93,7 @@ const LoanTableView: React.FC<LoanTableProps> = ({ events, principal, totalInter
               <th>Start Balance</th>
               <th>Payment</th>
               <th>Interest</th>
-              <th>Net Progress</th>
+              <th>Principal Paid</th>
               <th>End Balance</th>
             </tr>
           </thead>
@@ -112,7 +112,7 @@ const LoanTableView: React.FC<LoanTableProps> = ({ events, principal, totalInter
                   <td>{formatCurrency(event.startBalance)}</td>
                   <td className="payment-col">{formatCurrency(event.displayPayment)}</td>
                   <td className="interest-col">{formatCurrency(event.interest)}</td>
-                  <td className="net-progress-col">{formatCurrency(event.netProgress)}</td>
+                  <td className="net-progress-col">{formatCurrency(event.principalPaid)}</td>
                   <td className={event.endBalance < 0.01 ? 'zero-balance' : ''}>
                     {formatCurrency(event.endBalance)}
                   </td>
@@ -288,7 +288,7 @@ export const AmortizationTable: React.FC<AmortizationTableProps> = ({ data, mult
                   <th>Start Balance</th>
                   <th>Payment</th>
                   <th>Interest</th>
-                  <th>Net Progress</th>
+                  <th>Principal Paid</th>
                   <th>End Balance</th>
                 </tr>
               </thead>
@@ -307,7 +307,7 @@ export const AmortizationTable: React.FC<AmortizationTableProps> = ({ data, mult
                       <td>{formatCurrency(event.startBalance)}</td>
                       <td className="payment-col">{formatCurrency(event.displayPayment)}</td>
                       <td className="interest-col">{formatCurrency(event.interest)}</td>
-                      <td className="net-progress-col">{formatCurrency(event.netProgress)}</td>
+                      <td className="net-progress-col">{formatCurrency(event.principalPaid)}</td>
                       <td className={event.endBalance < 0.01 ? 'zero-balance' : ''}>
                         {formatCurrency(event.endBalance)}
                       </td>

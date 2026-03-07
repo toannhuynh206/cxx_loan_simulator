@@ -146,6 +146,8 @@ struct AutoLoanEntry {
     double downPayment;
     double tradeInValue;
     double tradeInPayoff;
+    double salesTaxPercent;  // State + local sales tax %, added to financed amount
+    double docAndRegFees;    // Dealer doc fee + registration/title ($)
     int vehicleYear;
     bool isUsed;
     std::string inputMode; // "future" (planning) or "existing" (active loan)
@@ -163,6 +165,8 @@ struct AutoLoanEntry {
         entry.downPayment = json.get("downPayment", 0.0).asDouble();
         entry.tradeInValue = json.get("tradeInValue", 0.0).asDouble();
         entry.tradeInPayoff = json.get("tradeInPayoff", 0.0).asDouble();
+        entry.salesTaxPercent = json.get("salesTaxPercent", 0.0).asDouble();
+        entry.docAndRegFees = json.get("docAndRegFees", 0.0).asDouble();
         entry.vehicleYear = json.get("vehicleYear", 2024).asInt();
         entry.isUsed = json.get("isUsed", false).asBool();
         entry.inputMode = json.get("inputMode", "future").asString();

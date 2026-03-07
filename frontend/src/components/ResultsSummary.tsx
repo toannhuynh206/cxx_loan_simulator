@@ -18,9 +18,19 @@ export const ResultsSummary: React.FC<ResultsSummaryProps> = ({ data }) => {
   const yearsToPayoff = Math.floor(data.totalMonths / 12);
   const remainingMonths = data.totalMonths % 12;
 
+  // Debt-free date
+  const today = new Date();
+  const debtFreeDate = new Date(today.getFullYear(), today.getMonth() + data.totalMonths, 1);
+  const debtFreeDateStr = debtFreeDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
   return (
     <div className="results-summary">
       <h3>Loan Summary</h3>
+
+      <div className="debt-free-headline">
+        <span className="debt-free-label">Debt-free by</span>
+        <span className="debt-free-date">{debtFreeDateStr}</span>
+      </div>
 
       <div className="summary-grid">
         <div className="summary-item">

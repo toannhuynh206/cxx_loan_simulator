@@ -66,6 +66,8 @@ export interface PersonalLoanEntry extends BaseLoanEntry {
   interestRate: number; // Fixed APR
   termMonths: number; // Loan term in months
   originationFeePercent: number; // 1-8% typical
+  hasPrepaymentPenalty?: boolean; // Whether lender charges early payoff fee
+  prepaymentPenaltyPercent?: number; // % of remaining balance, typically 1-5%
 }
 
 // Auto Loan - uses shared monthly cycle accrual model with depreciation display
@@ -80,6 +82,8 @@ export interface AutoLoanEntry extends BaseLoanEntry {
   tradeInPayoff: number; // Remaining loan on trade-in
   vehicleYear: number; // For depreciation calculation
   isUsed: boolean;
+  salesTaxPercent?: number; // State + local sales tax %, added to loan
+  docAndRegFees?: number; // Dealer doc fee + registration/title ($)
 }
 
 // Mortgage - PITI with PMI tracking

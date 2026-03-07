@@ -1834,3 +1834,711 @@
   font-variant-numeric: tabular-nums;
   color: var(--color-text-primary);
 }
+
+/* ================================================================
+   MOBILE GUIDE (MobileGuide.tsx)
+   ================================================================ */
+
+.mg-root {
+  padding-bottom: var(--space-6);
+}
+
+/* ── Page header ─────────────────────────────────────────────── */
+.mg-page-header {
+  padding: var(--space-5) var(--space-4) var(--space-4);
+  text-align: center;
+}
+.mg-page-title {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin: 0 0 var(--space-2);
+}
+.mg-loan-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  color: var(--color-accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+.mg-example-banner {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: var(--space-2);
+  line-height: 1.4;
+}
+.mg-page-sub {
+  font-size: 0.8125rem;
+  color: var(--color-text-tertiary);
+  margin: var(--space-1) 0 0;
+  line-height: 1.5;
+}
+
+/* ── Accordion sections ──────────────────────────────────────── */
+.mg-section {
+  border-top: 1px solid var(--color-border);
+}
+.mg-section:last-child {
+  border-bottom: 1px solid var(--color-border);
+}
+.mg-section-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-4);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--color-text-primary);
+  transition: background 0.15s;
+}
+.mg-section-header:active {
+  background: var(--color-bg-tertiary);
+}
+.mg-section--open .mg-section-header {
+  background: var(--color-bg-secondary);
+}
+.mg-sec-num {
+  font-family: var(--font-display);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  color: var(--color-accent);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: 6px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.mg-section-header-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.mg-section-title {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.mg-section-sub {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  line-height: 1.3;
+}
+.mg-section-body {
+  padding: var(--space-2) var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Shared note ─────────────────────────────────────────────── */
+.mg-note {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  border-left: 3px solid var(--color-accent-muted);
+}
+
+/* ── Section 1: Triad cards ──────────────────────────────────── */
+.mg-triad {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.mg-triad-card {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-4);
+}
+.mg-triad-card--hi {
+  background: var(--color-error-subtle);
+  border-color: var(--color-error);
+}
+.mg-triad-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+.mg-triad-glyph {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mg-triad-glyph--hi {
+  background: var(--color-error-subtle);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+.mg-triad-name {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+}
+.mg-triad-val {
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.mg-triad-desc {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+}
+.mg-triad-connector {
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-size: 1.25rem;
+  line-height: 1.2;
+  padding: 2px 0;
+}
+
+/* ── APR Rate Chain ──────────────────────────────────────────── */
+.mg-rate-chain {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: var(--space-3) var(--space-3);
+}
+.mg-rate-chain-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-2);
+}
+.mg-rate-chain-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mg-rate-chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 5px 10px;
+}
+.mg-rate-chip-val {
+  font-family: var(--font-display);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.mg-rate-chip-desc {
+  font-size: 0.625rem;
+  color: var(--color-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mg-rate-op {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-tertiary);
+  padding: 0 2px;
+}
+
+/* ── Section 2: Payment split bar ───────────────────────────── */
+.mg-split-card {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-4);
+}
+.mg-split-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin-bottom: 4px;
+}
+.mg-split-amount {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 10px;
+}
+.mg-split-bar {
+  height: 12px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  margin-bottom: 10px;
+  background: var(--color-bg-tertiary);
+}
+.mg-split-bar-interest {
+  background: var(--color-error);
+  transition: width 0.6s ease;
+}
+.mg-split-bar-principal {
+  background: var(--color-accent);
+  transition: width 0.6s ease;
+}
+.mg-split-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.mg-split-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+}
+.mg-split-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.mg-split-dot--int { background: var(--color-error); }
+.mg-split-dot--pri { background: var(--color-accent); }
+.mg-split-lbl-text { color: var(--color-text-secondary); flex: 1; }
+.mg-split-lbl-val { font-weight: 700; color: var(--color-text-primary); font-variant-numeric: tabular-nums; }
+
+/* ── Vertical payment flow ───────────────────────────────────── */
+.mg-flow {
+  display: flex;
+  flex-direction: column;
+  padding: 0 var(--space-2);
+  position: relative;
+}
+.mg-flow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.mg-flow-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.mg-flow-dot--neutral { background: var(--color-text-tertiary); }
+.mg-flow-dot--pay     { background: var(--color-accent); }
+.mg-flow-dot--down    { background: #22c55e; }
+.mg-flow-dot--int     { background: var(--color-error); }
+
+.mg-flow-line {
+  width: 2px;
+  height: 20px;
+  background: var(--color-border);
+  margin-left: 5px;
+}
+.mg-flow-content {
+  flex: 1;
+  padding-bottom: 4px;
+}
+.mg-flow-tag {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin-bottom: 2px;
+}
+.mg-flow-tag--pay  { color: var(--color-accent); }
+.mg-flow-tag--down { color: #16a34a; }
+.mg-flow-tag--int  { color: var(--color-error); }
+.mg-flow-big {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.mg-flow-caption {
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+}
+.mg-flow-split {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 2px;
+}
+.mg-flow-int { font-size: 0.75rem; color: var(--color-error); font-weight: 600; }
+.mg-flow-pri { font-size: 0.75rem; color: var(--color-accent); font-weight: 600; }
+
+/* Daily cost pill */
+.mg-daily-cost {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--color-error-subtle);
+  border: 1px solid var(--color-error);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.mg-daily-cost-label { font-size: 0.75rem; color: var(--color-text-secondary); }
+.mg-daily-cost-val { font-weight: 700; color: var(--color-error); font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+
+/* ── Section 3: Term cards grid ──────────────────────────────── */
+.mg-term-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.mg-term-card {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.mg-term-type {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-tertiary);
+  margin-bottom: 3px;
+}
+.mg-term-val {
+  font-family: var(--font-display);
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.mg-term-note {
+  font-size: 0.6875rem;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+/* ── Formula ─────────────────────────────────────────────────── */
+.mg-formula {
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-4);
+}
+.mg-formula-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-tertiary);
+  margin-bottom: var(--space-3);
+}
+.mg-formula-display {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: var(--space-3);
+  justify-content: center;
+}
+.mg-formula-lhs {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+.mg-formula-frac {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.mg-formula-num, .mg-formula-den {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+.mg-formula-bar {
+  height: 1.5px;
+  width: 100%;
+  background: var(--color-text-tertiary);
+}
+.mg-formula-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+.mg-formula-result {
+  color: var(--color-accent);
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+/* ── Trace table ─────────────────────────────────────────────── */
+.mg-trace-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+.mg-trace-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+.mg-trace-table {
+  width: 100%;
+  min-width: 480px;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+.mg-trace-table th {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-tertiary);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 10px;
+  text-align: right;
+}
+.mg-trace-table th:first-child { text-align: center; }
+.mg-trace-table td {
+  padding: 8px 10px;
+  text-align: right;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+}
+.mg-trace-mo {
+  text-align: center !important;
+  font-weight: 700;
+  color: var(--color-text-primary) !important;
+}
+.mg-col-int { color: var(--color-error) !important; }
+.mg-col-pri { color: var(--color-accent) !important; }
+.mg-trace-ellipsis td {
+  text-align: center;
+  color: var(--color-text-tertiary);
+  font-style: italic;
+  padding: 6px;
+}
+.mg-trace-last td { font-weight: 600; }
+.mg-trace-zero { color: var(--color-accent) !important; font-weight: 700 !important; }
+
+/* ── Multi-loan cascade ──────────────────────────────────────── */
+.mg-cascade {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-4);
+  background: var(--color-bg-secondary);
+}
+.mg-cascade-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-2);
+}
+.mg-cascade-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.mg-cascade-budget {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.mg-cascade-budget-label { font-size: 0.75rem; color: var(--color-text-secondary); }
+.mg-cascade-budget-val { font-family: var(--font-display); font-weight: 700; color: var(--color-accent); }
+.mg-cascade-arrow {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--color-text-tertiary);
+  font-weight: 600;
+}
+.mg-cascade-arrow--surplus { color: var(--color-accent); }
+.mg-cascade-loans { display: flex; flex-direction: column; gap: 6px; }
+.mg-cascade-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  flex-wrap: wrap;
+}
+.mg-cascade-chip--top {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+}
+.mg-cascade-chip-name { font-weight: 600; font-size: 0.8rem; color: var(--color-text-primary); flex: 1; }
+.mg-cascade-chip-apr { font-size: 0.7rem; color: var(--color-error); font-weight: 600; }
+.mg-cascade-chip-min { font-size: 0.7rem; color: var(--color-text-tertiary); margin-left: auto; }
+.mg-cascade-surplus {
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  text-align: center;
+}
+.mg-cascade-freed {
+  background: var(--color-bg-tertiary);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+/* ── Section 4: Loan type tabs ───────────────────────────────── */
+.mg-loan-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.mg-loan-tabs::-webkit-scrollbar { display: none; }
+.mg-loan-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.mg-loan-tab--active {
+  background: var(--color-accent-subtle);
+  border-color: var(--color-accent-muted);
+  color: var(--color-accent);
+}
+.mg-loan-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.mg-loan-tagline {
+  font-size: 0.8375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin: 0;
+  font-style: italic;
+}
+.mg-insights {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.mg-insight {
+  display: flex;
+  gap: var(--space-3);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: var(--space-3) var(--space-3);
+}
+.mg-insight-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.mg-insight-body { flex: 1; }
+.mg-insight-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 4px;
+}
+.mg-insight-text {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+.mg-insight-callout {
+  margin-top: 6px;
+  padding: 5px 10px;
+  background: var(--color-accent-subtle);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 0 6px 6px 0;
+  font-size: 0.775rem;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+/* ── Debt-free banner (mobile home overview) ── */
+.m-debt-free-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-accent-subtle);
+  border: 1px solid var(--color-accent-muted);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  text-align: center;
+}
+.m-debt-free-label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+.m-debt-free-date {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--color-accent);
+  letter-spacing: -0.01em;
+}

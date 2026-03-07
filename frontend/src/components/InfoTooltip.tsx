@@ -9,30 +9,43 @@ interface InfoTooltipProps {
 export const InfoTooltip: React.FC<InfoTooltipProps> = ({ term, definition, howToFind }) => {
   const [isVisible, setIsVisible] = useState(false);
 
+  const close = () => setIsVisible(false);
+  const toggle = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsVisible(v => !v);
+  };
+
   return (
     <span
       className="info-tooltip-wrapper"
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
     >
+      {/* Mobile backdrop — tap anywhere outside to dismiss */}
+      {isVisible && (
+        <span className="info-tooltip__backdrop" onClick={close} aria-hidden="true" />
+      )}
+
       <button
         type="button"
         className="info-tooltip__trigger"
         onFocus={() => setIsVisible(true)}
         onBlur={() => setIsVisible(false)}
-        onClick={(e) => {
-          e.preventDefault();
-          setIsVisible(!isVisible);
-        }}
+        onClick={toggle}
         aria-label={`Info about ${term}`}
+        aria-expanded={isVisible}
       >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+        <svg viewBox="0 0 16 16" fill="currentColor">
           <circle cx="8" cy="8" r="8"/>
           <text x="8" y="11.5" textAnchor="middle" fill="white" fontSize="10" fontWeight="600" fontFamily="Georgia, serif" fontStyle="italic">i</text>
         </svg>
       </button>
+
       {isVisible && (
-        <div className="info-tooltip__content">
+        <div className="info-tooltip__content" role="tooltip">
+          {/* Mobile sheet handle */}
+          <div className="info-tooltip__sheet-handle" aria-hidden="true" />
           <div className="info-tooltip__term">{term}</div>
           <div className="info-tooltip__definition">{definition}</div>
           {howToFind && (
@@ -41,6 +54,15 @@ export const InfoTooltip: React.FC<InfoTooltipProps> = ({ term, definition, howT
               <span>{howToFind}</span>
             </div>
           )}
+          {/* Mobile close button */}
+          <button
+            type="button"
+            className="info-tooltip__sheet-close"
+            onClick={close}
+            aria-label="Close"
+          >
+            Done
+          </button>
         </div>
       )}
     </span>
@@ -57,8 +79,8 @@ export const FIELD_DEFINITIONS = {
   },
   monthlyPayment: {
     term: 'Monthly Payment',
-    definition: 'The amount you pay each month toward this debt.',
-    howToFind: 'Check your statement or set up autopay amount.',
+    definition: 'The amount you pay each month toward this debt. For mortgages: enter P&I only (principal + interest), not your total PITI payment. The strategy simulation uses P&I to calculate your payoff timeline.',
+    howToFind: 'For mortgages: find P&I on your statement — it is lower than your total payment. For other loans: your regular payment amount.',
   },
 
   // Credit Card
@@ -85,9 +107,9 @@ export const FIELD_DEFINITIONS = {
 
   // Personal Loan
   interestRate: {
-    term: 'Interest Rate',
-    definition: 'The annual rate used to accrue monthly interest in this simulator: balance × (rate/365 × 30).',
-    howToFind: 'Listed on your loan agreement or monthly statement.',
+    term: 'Interest Rate (Note Rate)',
+    definition: 'The annual rate used to compute monthly interest: balance × (rate/12). Use the rate from your loan documents — this is typically slightly lower than the APR disclosed at closing.',
+    howToFind: 'Listed on your loan agreement or current monthly statement.',
   },
   termMonths: {
     term: 'Loan Term',
@@ -189,5 +211,24 @@ export const FIELD_DEFINITIONS = {
     term: 'Origination Fee',
     definition: 'Fee deducted from loan disbursement. Federal Direct loans: 1.057%, PLUS loans: 4.228%.',
     howToFind: 'Listed on your loan disclosure. Federal rates are fixed.',
+  },
+
+  // Auto Loan — additional purchase costs
+  salesTax: {
+    term: 'Sales Tax',
+    definition: 'State and local sales tax applied to the vehicle purchase price. Adds directly to your loan amount. Varies by state: typically 4-10%.',
+    howToFind: 'Check your state DMV website or ask the dealer. Most dealers calculate this automatically on the purchase agreement.',
+  },
+  docAndRegFees: {
+    term: 'Doc & Registration Fees',
+    definition: 'Dealer documentation fee ($100-$900) plus state registration and title fees. These are financed into the loan amount.',
+    howToFind: 'Listed on the dealer\'s purchase order. Registration varies by state.',
+  },
+
+  // Personal Loan — prepayment
+  prepaymentPenalty: {
+    term: 'Prepayment Penalty',
+    definition: 'A fee charged for paying off the loan early, typically 1-5% of the remaining balance or a flat fee. If present, extra payments may not benefit you as much as the calculator shows.',
+    howToFind: 'Check your loan agreement under "Prepayment" or call your lender to ask.',
   },
 };

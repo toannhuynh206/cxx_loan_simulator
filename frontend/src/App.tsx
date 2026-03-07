@@ -113,15 +113,12 @@ function App() {
     setIsLoading(true);
     setError(null);
 
-    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
     try {
-      const [response] = await Promise.all([
+      const response = await (
         mode === 'auto'
           ? calculateCascade(loans, budget, strategy)
-          : calculateMultipleLoans(loans),
-        delay(2500)
-      ]);
+          : calculateMultipleLoans(loans)
+      );
       setMultiLoanData(response);
       setMobileResultsTab('overview'); // Reset to first tab on new calculation
     } catch (err: unknown) {

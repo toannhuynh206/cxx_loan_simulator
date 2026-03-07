@@ -353,7 +353,10 @@ LoanCalculationResult AmortizationCalculator::calculatePersonalLoan(const Person
 // AUTO LOAN  —  APR / 12 (actuarial monthly model)
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEntry& entry) {
-    if (entry.vehiclePrice <= 0) {
+    const bool existingMode = entry.inputMode == "existing";
+
+    // vehiclePrice is only required in future (planning) mode
+    if (!existingMode && entry.vehiclePrice <= 0) {
         throw std::invalid_argument("Auto loan vehiclePrice must be greater than 0");
     }
     if (entry.balance <= 0) {
@@ -388,26 +391,22 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
     // Auto loans use the actuarial monthly model: APR / 12
     double rate = installmentMonthlyRate(entry.interestRate);
     double calculatedPayment = calculateAmortizationPayment(entry.balance, rate, entry.termMonths);
-    const bool existingMode = entry.inputMode == "existing";
     double payment = calculatedPayment;
 
     if (existingMode) {
         if (entry.monthlyPayment <= 0) {
             throw std::invalid_argument("Auto loan monthlyPayment must be greater than 0 in existing mode");
         }
-        // Existing-loan mode trusts the user's contractual minimum payment.
+        // Existing-loan mode trusts the user's contractual payment.
         payment = entry.monthlyPayment;
     } else {
-        // Future mode defaults to amortized payment; allow optional extra payment.
-        payment = (entry.monthlyPayment > calculatedPayment) ? entry.monthlyPayment : calculatedPayment;
+        // Future mode: use user-specified payment if provided, otherwise calculated minimum.
+        payment = (entry.monthlyPayment > 0) ? entry.monthlyPayment : calculatedPayment;
+        if (payment < calculatedPayment) payment = calculatedPayment; // floor at amortization min
     }
     validatePaymentCoversFirstMonthInterest(entry.balance, rate, payment, "Auto loan");
 
     result.monthlyPayment = payment;
-
-    double vehicleValue = entry.vehiclePrice;
-    double annualDepreciation = entry.isUsed ? 0.10 : 0.15;
-    double firstYearBonus = entry.isUsed ? 0.05 : 0.10;
 
     buildSimpleSchedule(
         entry.balance,
@@ -420,14 +419,20 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
         result.totalMonths
     );
 
-    for (int month = 1; month <= result.totalMonths; month++) {
-        double monthlyDepreciation;
-        if (month <= 12) {
-            monthlyDepreciation = vehicleValue * (annualDepreciation + firstYearBonus) / 12.0;
-        } else {
-            monthlyDepreciation = vehicleValue * annualDepreciation / 12.0;
+    // Depreciation tracking: only when vehiclePrice is known (future mode or provided)
+    double vehicleValue = entry.vehiclePrice;
+    if (vehicleValue > 0) {
+        double annualDepreciation = entry.isUsed ? 0.10 : 0.15;
+        double firstYearBonus = entry.isUsed ? 0.05 : 0.10;
+        for (int month = 1; month <= result.totalMonths; month++) {
+            double monthlyDepreciation;
+            if (month <= 12) {
+                monthlyDepreciation = vehicleValue * (annualDepreciation + firstYearBonus) / 12.0;
+            } else {
+                monthlyDepreciation = vehicleValue * annualDepreciation / 12.0;
+            }
+            vehicleValue = std::max(0.0, vehicleValue - monthlyDepreciation);
         }
-        vehicleValue = std::max(0.0, vehicleValue - monthlyDepreciation);
     }
 
     result.vehicleValue = vehicleValue;
@@ -439,7 +444,10 @@ LoanCalculationResult AmortizationCalculator::calculateAutoLoan(const AutoLoanEn
 // PITI: Principal, Interest, Taxes, Insurance with PMI tracking
 // ============================================
 LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEntry& entry) {
-    if (entry.homePrice <= 0) {
+    const bool existingModeMtg = entry.inputMode == "existing";
+
+    // homePrice is only required in future (planning) mode
+    if (!existingModeMtg && entry.homePrice <= 0) {
         throw std::invalid_argument("Mortgage homePrice must be greater than 0");
     }
     if (entry.balance <= 0) {
@@ -476,15 +484,17 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
 
     // Mortgage uses the actuarial monthly model: APR / 12
     double rate = installmentMonthlyRate(entry.interestRate);
-    const bool existingMode = entry.inputMode == "existing";
     const double calculatedPiPayment = calculateAmortizationPayment(entry.balance, rate, termMonths);
     double piPayment = calculatedPiPayment;
-    if (existingMode) {
+    if (existingModeMtg) {
         if (entry.monthlyPayment <= 0) {
             throw std::invalid_argument("Mortgage monthlyPayment must be greater than 0 in existing mode");
         }
         // Existing-loan mode expects the known P&I payment from statement.
         piPayment = entry.monthlyPayment;
+    } else if (entry.monthlyPayment > 0) {
+        // Future mode: use user-specified payment; floor at amortization minimum.
+        piPayment = std::max(entry.monthlyPayment, calculatedPiPayment);
     }
     validatePaymentCoversFirstMonthInterest(entry.balance, rate, piPayment, "Mortgage");
 
@@ -492,9 +502,10 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
     double monthlyInsurance = entry.homeInsuranceAnnual / 12.0;
     double escrowPayment = entry.includeEscrow ? (monthlyTax + monthlyInsurance + entry.hoaMonthly) : 0.0;
 
-    double originalLTV = entry.balance / entry.homePrice;
+    // PMI only applies when homePrice is known (future mode)
+    double originalLTV = (entry.homePrice > 0) ? (entry.balance / entry.homePrice) : 1.0;
     double monthlyPMI = 0.0;
-    if (originalLTV > 0.80 && entry.pmiRate > 0) {
+    if (originalLTV > 0.80 && entry.pmiRate > 0 && entry.homePrice > 0) {
         monthlyPMI = (entry.balance * entry.pmiRate / 100.0) / 12.0;
     }
 
@@ -511,14 +522,19 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
         result.totalMonths
     );
 
-    for (auto& event : result.events) {
-        double currentLTV = event.endBalance / entry.homePrice;
-        if (currentLTV <= 0.78) {
-            event.pmiPayment = 0.0;
-        } else if (currentLTV <= 0.80 && event.month > 24) {
-            event.pmiPayment = 0.0;
+    for (size_t i = 0; i < result.events.size(); ++i) {
+        MonthlyEvent& event = result.events[i];
+        if (entry.homePrice > 0) {
+            double currentLTV = event.endBalance / entry.homePrice;
+            if (currentLTV <= 0.78) {
+                event.pmiPayment = 0.0;
+            } else if (currentLTV <= 0.80 && event.month > 24) {
+                event.pmiPayment = 0.0;
+            } else {
+                event.pmiPayment = monthlyPMI;
+            }
         } else {
-            event.pmiPayment = monthlyPMI;
+            event.pmiPayment = 0.0;
         }
         result.totalPMI += event.pmiPayment;
 
@@ -530,7 +546,11 @@ LoanCalculationResult AmortizationCalculator::calculateMortgage(const MortgageEn
     }
 
     double endingBalance = result.events.empty() ? entry.balance : result.events.back().endBalance;
-    result.equityPercent = ((entry.homePrice - endingBalance) / entry.homePrice) * 100.0;
+    if (entry.homePrice > 0) {
+        result.equityPercent = ((entry.homePrice - endingBalance) / entry.homePrice) * 100.0;
+    } else {
+        result.equityPercent = 0.0;
+    }
     return result;
 }
 
@@ -864,7 +884,7 @@ MultiLoanResponse AmortizationCalculator::calculateCascade(const CascadeRequest&
             evt.interest      = interest;
             evt.payment       = payment;
             evt.endBalance    = endBalance;
-            evt.principalPaid = payment - interest;
+            evt.principalPaid = std::max(0.0, payment - interest);
             evt.totalPayment  = payment;
 
             states[i].balance        = endBalance;
