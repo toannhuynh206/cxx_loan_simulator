@@ -268,8 +268,8 @@ export const MobileApp: React.FC<MobileAppProps> = ({
         )}
       </div>
 
-      {/* ── Reset pill (floating, above nav) ── */}
-      {hasResults && !inputExpanded && activeTab !== 'guide' && (
+      {/* ── Reset pill (floating, above nav) — always visible except Guide ── */}
+      {activeTab !== 'guide' && (
         <button className="m-reset-pill" onClick={() => { onReset(); setActiveTab('home'); setInputExpanded(true); }}>
           ↺ Reset
         </button>
