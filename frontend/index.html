@@ -10,11 +10,100 @@
     <meta name="apple-mobile-web-app-title" content="LoanScope" />
     <meta name="theme-color" content="#0d9488" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#2dd4bf" media="(prefers-color-scheme: dark)" />
-    <meta name="description" content="LoanScope - A tool to visualize your loans. Strategize your path to financial freedom." />
-    <meta name="keywords" content="loan calculator, amortization, debt payoff, interest calculator, loan visualization" />
-    <meta property="og:title" content="LoanScope - Loan Visualization Tool" />
-    <meta property="og:description" content="A tool to visualize your loans. Strategize your path to financial freedom." />
-    <title>LoanScope — Loan Visualization Tool</title>
+
+    <!-- Primary SEO -->
+    <title>LoanScope — Free Loan Calculator & Debt Payoff Strategy</title>
+    <meta name="description" content="Free loan calculator for mortgages, student loans, auto loans, and credit cards. Compare debt avalanche vs snowball strategies, visualize amortization, and find your fastest path to debt freedom." />
+    <meta name="keywords" content="loan calculator, student loan calculator, mortgage calculator, auto loan calculator, credit card payoff calculator, debt avalanche calculator, debt snowball calculator, amortization calculator, loan payoff strategy, debt free calculator" />
+    <link rel="canonical" href="https://loanscope.org/" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="LoanScope" />
+
+    <!-- Open Graph (Facebook, LinkedIn) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://loanscope.org/" />
+    <meta property="og:title" content="LoanScope — Free Loan Calculator & Debt Payoff Strategy" />
+    <meta property="og:description" content="Calculate and compare mortgage, student loan, auto loan, and credit card payoff strategies. Avalanche vs snowball — see exactly which saves you the most money." />
+    <meta property="og:image" content="https://loanscope.org/og-image.png" />
+    <meta property="og:site_name" content="LoanScope" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://loanscope.org/" />
+    <meta name="twitter:title" content="LoanScope — Free Loan Calculator & Debt Payoff Strategy" />
+    <meta name="twitter:description" content="Calculate mortgage, student loan, auto loan, and credit card payoffs. Compare debt avalanche vs snowball strategies side by side." />
+    <meta name="twitter:image" content="https://loanscope.org/og-image.png" />
+
+    <!-- Structured Data: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "LoanScope",
+      "url": "https://loanscope.org",
+      "description": "Free loan calculator and debt payoff strategy tool for mortgages, student loans, auto loans, and credit cards.",
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Mortgage calculator with PMI and escrow",
+        "Student loan payoff calculator",
+        "Auto loan calculator with depreciation",
+        "Credit card payoff calculator",
+        "Debt avalanche strategy calculator",
+        "Debt snowball strategy calculator",
+        "Multi-loan amortization comparison",
+        "Loan payoff timeline visualization"
+      ]
+    }
+    </script>
+
+    <!-- Structured Data: FAQPage (helps with Google rich results) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the debt avalanche method?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The debt avalanche method pays off loans in order of highest interest rate first, minimizing total interest paid. It is mathematically the most cost-effective debt payoff strategy."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the debt snowball method?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The debt snowball method pays off the smallest balance first, regardless of interest rate. It provides psychological wins by eliminating accounts quickly."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is mortgage interest calculated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Mortgage interest is calculated monthly using the formula: Interest = Balance × (Annual Rate ÷ 12). Each payment covers interest first, with the remainder reducing principal."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How long will it take to pay off my student loans?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Student loan payoff time depends on your balance, interest rate, and monthly payment. Standard repayment is 10 years, but you can use LoanScope to simulate accelerated payoff with extra payments."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>
