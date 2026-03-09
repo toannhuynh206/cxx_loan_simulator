@@ -84,14 +84,23 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
   const hasResults = !!loanData && !!multiLoanData;
   const prevIsLoading = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
-  // Auto-navigate whenever a calculation completes (isLoading: true → false)
+  // Smooth transition when calculation completes
   useEffect(() => {
     const wasLoading = prevIsLoading.current;
     prevIsLoading.current = isLoading;
     if (wasLoading && !isLoading && hasResults) {
-      setInputExpanded(false);
-      setActiveTab('home');
+      // Fade out current content
+      setIsTransitioning(true);
+      setTimeout(() => {
+        setInputExpanded(false);
+        setActiveTab('home');
+        // Scroll to top then fade in
+        contentRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+        setIsTransitioning(false);
+      }, 200);
     }
   }, [isLoading, hasResults]);
 
@@ -134,13 +143,16 @@ export const MobileApp: React.FC<MobileAppProps> = ({
 
   // Navigate to a result tab (only when results exist)
   const goToResultTab = (tab: MobileTab) => {
-    if (hasResults) setActiveTab(tab);
+    if (!hasResults) return;
+    setActiveTab(tab);
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Navigate to Home — always works; collapses form if results exist
   const goHome = () => {
     setActiveTab('home');
     if (hasResults) setInputExpanded(false);
+    contentRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   // Open form for editing (navigates to Home and expands form)
@@ -163,7 +175,7 @@ export const MobileApp: React.FC<MobileAppProps> = ({
       </header>
 
       {/* ── Main content ── */}
-      <div className="m-content">
+      <div ref={contentRef} className={`m-content${isTransitioning ? ' m-content--transitioning' : ''}`}>
 
         {/* ── HOME TAB ── form + overview ── */}
         {activeTab === 'home' && (

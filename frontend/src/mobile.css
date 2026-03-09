@@ -133,6 +133,12 @@
   padding: var(--space-4);
   padding-top: calc(56px + var(--space-4)); /* offset fixed header */
   padding-bottom: calc(88px + env(safe-area-inset-bottom, 16px)); /* always clear fixed bottom nav */
+  transition: opacity 0.2s ease;
+}
+
+.m-content--transitioning {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* ── Collapsed input pill ────────────────────────────────────── */
@@ -574,12 +580,12 @@
 
 /* ── Tab content fade-in ─────────────────────────────────────── */
 @keyframes mTabFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: none; }
 }
 
 .m-tab-content {
-  animation: mTabFadeIn 0.2s ease both;
+  animation: mTabFadeIn 0.28s ease both;
 }
 
 /* ── Loan selector tabs (multi-loan schedule) ────────────────── */

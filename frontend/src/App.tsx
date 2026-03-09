@@ -9,6 +9,7 @@ import { DebtPayoffStrategy } from './components/DebtPayoffStrategy';
 import { PaymentScenarios } from './components/PaymentScenarios';
 import { HowItWorks } from './components/HowItWorks';
 import { MobileApp } from './components/MobileApp';
+import { SectionIndex } from './components/SectionIndex';
 import { useMobileLayout } from './hooks/useMobileLayout';
 import { calculateMultipleLoans, calculateCascade } from './services/loanApi';
 import { LoanEntry, LoanResponse, MonthlyEvent, CombinedLoanResult } from './types/loan';
@@ -231,35 +232,35 @@ function App() {
 
                 {/* Overview tab: Summary + Breakdown */}
                 <div className={`mobile-tab-panel ${mobileResultsTab === 'overview' ? 'active' : ''}`} data-tab="overview">
-                  <section className="card summary-section">
+                  <section id="section-summary" className="card summary-section">
                     <ResultsSummary data={loanData} />
                   </section>
-                  <section className="card breakdown-section">
+                  <section id="section-breakdown" className="card breakdown-section">
                     <PaymentBreakdownChart data={loanData} />
                   </section>
                 </div>
 
                 {/* Balance tab: Chart */}
                 <div className={`mobile-tab-panel ${mobileResultsTab === 'balance' ? 'active' : ''}`} data-tab="balance">
-                  <section className="card chart-section">
+                  <section id="section-chart" className="card chart-section">
                     <AmortizationChart data={loanData} multiLoanData={multiLoanData} viewMode={viewMode} onViewModeChange={setViewMode} />
                   </section>
                 </div>
 
                 {/* Schedule tab: Table */}
                 <div className={`mobile-tab-panel ${mobileResultsTab === 'schedule' ? 'active' : ''}`} data-tab="schedule">
-                  <section className="card table-section">
+                  <section id="section-table" className="card table-section">
                     <AmortizationTable data={loanData} multiLoanData={multiLoanData} viewMode={viewMode} onViewModeChange={setViewMode} />
                   </section>
                 </div>
 
                 {/* More tab: Scenarios + Strategy */}
                 <div className={`mobile-tab-panel ${mobileResultsTab === 'more' ? 'active' : ''}`} data-tab="more">
-                  <section className="card scenarios-section">
+                  <section id="section-scenarios" className="card scenarios-section">
                     <PaymentScenarios multiLoanData={multiLoanData!} />
                   </section>
                   {multiLoanData && multiLoanData.loans.length > 1 && (
-                    <section className="card strategy-section">
+                    <section id="section-strategy" className="card strategy-section">
                       <DebtPayoffStrategy loanData={multiLoanData} />
                     </section>
                   )}
@@ -279,6 +280,12 @@ function App() {
       <footer>
         <p>LoanScope — Strategize your path to financial freedom</p>
       </footer>
+
+      {/* Left section index — desktop only, shown after simulation */}
+      <SectionIndex
+        visible={!!loanData && activeView === 'calculator'}
+        hasStrategy={!!multiLoanData && multiLoanData.loans.length > 1}
+      />
 
       {/* Floating Action Buttons */}
       <div className="fab-container">
